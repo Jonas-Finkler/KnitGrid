@@ -5,6 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Knitting Pattern Tool</title>
   <style>
+    :root {
+      --bg-primary: #f5f5f5;
+      --bg-secondary: #fff;
+      --bg-tertiary: #e9ecef;
+      --text-primary: #333;
+      --text-secondary: #666;
+      --border-color: #ddd;
+      --border-color-dark: #ccc;
+      --canvas-shadow: rgba(0,0,0,0.1);
+      --status-bg: #333;
+      --status-text: #fff;
+      --status-kbd: #555;
+      --display-mode-bg: #d4edda;
+      --display-mode-text: #155724;
+      --grid-line: #ddd;
+    }
+
+    body.dark-mode {
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #2d2d2d;
+      --bg-tertiary: #3d3d3d;
+      --text-primary: #e0e0e0;
+      --text-secondary: #aaa;
+      --border-color: #444;
+      --border-color-dark: #555;
+      --canvas-shadow: rgba(0,0,0,0.4);
+      --status-bg: #111;
+      --status-text: #e0e0e0;
+      --status-kbd: #444;
+      --display-mode-bg: #1e4620;
+      --display-mode-text: #90ee90;
+      --grid-line: #444;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -13,7 +47,8 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -24,29 +59,37 @@
       align-items: center;
       gap: 8px;
       padding: 12px 16px;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
       flex-wrap: wrap;
     }
 
     .toolbar button {
       padding: 8px 16px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color-dark);
       border-radius: 4px;
-      background: #fff;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
       cursor: pointer;
       font-size: 14px;
       transition: background 0.2s;
     }
 
     .toolbar button:hover {
-      background: #f0f0f0;
+      background: var(--bg-tertiary);
     }
 
     .toolbar button.active {
       background: #007bff;
       color: #fff;
       border-color: #007bff;
+    }
+
+    .toolbar .separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border-color);
+      margin: 0 4px;
     }
 
     .toolbar .spacer {
@@ -57,26 +100,44 @@
       font-weight: bold;
       padding: 8px 12px;
       border-radius: 4px;
-      background: #e9ecef;
+      background: var(--bg-tertiary);
     }
 
     .toolbar .mode-indicator.display-mode {
-      background: #d4edda;
-      color: #155724;
+      background: var(--display-mode-bg);
+      color: var(--display-mode-text);
+    }
+
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .zoom-controls button {
+      padding: 8px 12px;
+      min-width: 36px;
+    }
+
+    .zoom-controls .zoom-label {
+      min-width: 50px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     .canvas-container {
       flex: 1;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       padding: 20px;
       overflow: auto;
     }
 
     #canvas {
-      background: #fff;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      background: var(--bg-secondary);
+      box-shadow: 0 2px 10px var(--canvas-shadow);
       cursor: crosshair;
     }
 
@@ -85,15 +146,15 @@
       align-items: center;
       gap: 8px;
       padding: 12px 16px;
-      background: #fff;
-      border-top: 1px solid #ddd;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
       flex-wrap: wrap;
     }
 
     .color-swatch {
       width: 32px;
       height: 32px;
-      border: 2px solid #ccc;
+      border: 2px solid var(--border-color-dark);
       border-radius: 4px;
       cursor: pointer;
       transition: transform 0.1s;
@@ -111,12 +172,12 @@
     .add-color-btn {
       width: 32px;
       height: 32px;
-      border: 2px dashed #ccc;
+      border: 2px dashed var(--border-color-dark);
       border-radius: 4px;
-      background: #fff;
+      background: var(--bg-secondary);
       cursor: pointer;
       font-size: 20px;
-      color: #999;
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -129,7 +190,7 @@
 
     .palette-bar .selected-info {
       margin-left: 16px;
-      color: #666;
+      color: var(--text-secondary);
     }
 
     .status-bar {
@@ -137,13 +198,14 @@
       align-items: center;
       gap: 16px;
       padding: 8px 16px;
-      background: #333;
-      color: #fff;
+      background: var(--status-bg);
+      color: var(--status-text);
       font-size: 13px;
+      flex-wrap: wrap;
     }
 
     .status-bar kbd {
-      background: #555;
+      background: var(--status-kbd);
       padding: 2px 6px;
       border-radius: 3px;
       font-family: monospace;
@@ -168,7 +230,8 @@
     }
 
     .modal {
-      background: #fff;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
       padding: 24px;
       border-radius: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -192,9 +255,11 @@
     .modal input[type="number"] {
       width: 100%;
       padding: 8px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color-dark);
       border-radius: 4px;
       font-size: 14px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
     }
 
     .modal .button-row {
@@ -206,10 +271,12 @@
 
     .modal button {
       padding: 8px 16px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--border-color-dark);
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
     }
 
     .modal button.primary {
@@ -241,7 +308,15 @@
     <button id="btn-load">Load</button>
     <button id="btn-save">Save</button>
     <button id="btn-display">Display</button>
+    <div class="separator"></div>
+    <div class="zoom-controls">
+      <button id="btn-zoom-out" title="Zoom out">-</button>
+      <span class="zoom-label" id="zoom-label">100%</span>
+      <button id="btn-zoom-in" title="Zoom in">+</button>
+      <button id="btn-zoom-fit" title="Fit to width">Fit</button>
+    </div>
     <div class="spacer"></div>
+    <button id="btn-dark-mode" title="Toggle dark mode">Dark</button>
     <div class="mode-indicator" id="mode-indicator">Mode: Edit</div>
   </div>
 
@@ -259,7 +334,7 @@
     <span id="status-row">Row 1 of 20</span>
     <span><kbd>Ctrl+Z</kbd> Undo</span>
     <span><kbd>Ctrl+Y</kbd> Redo</span>
-    <span><kbd>Space</kbd> Next Row</span>
+    <span><kbd>Space</kbd>/<kbd>Arrow</kbd> Navigate Rows</span>
     <span><kbd>Esc</kbd> Edit Mode</span>
   </div>
 
@@ -313,8 +388,18 @@
     // Drawing state
     let isPainting = false;
     let cellSize = 20;
-    const MIN_CELL_SIZE = 10;
-    const MAX_CELL_SIZE = 40;
+    const MIN_CELL_SIZE = 4;
+    const MAX_CELL_SIZE = 60;
+
+    // Zoom state
+    let zoomMode = 'auto'; // 'auto', 'manual', 'fit'
+    let manualZoom = 1.0;  // 1.0 = 100%
+    const ZOOM_STEP = 0.25;
+    const MIN_ZOOM = 0.25;
+    const MAX_ZOOM = 4.0;
+
+    // Dark mode
+    let darkMode = localStorage.getItem('darkMode') === 'true';
 
     // Initialize grid
     function initGrid(width, height) {
@@ -339,14 +424,33 @@
       const maxWidth = container.clientWidth - 40;
       const maxHeight = container.clientHeight - 40;
 
-      // Calculate cell size to fit
-      const cellW = Math.floor(maxWidth / state.width);
-      const cellH = Math.floor(maxHeight / state.height);
-      cellSize = Math.min(cellW, cellH);
-      cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
+      if (zoomMode === 'fit') {
+        // Fit width: make pattern span full width
+        cellSize = Math.floor(maxWidth / state.width);
+        cellSize = Math.max(MIN_CELL_SIZE, cellSize);
+      } else if (zoomMode === 'manual') {
+        // Manual zoom: use fixed cell size based on zoom level
+        const baseSize = 20;
+        cellSize = Math.round(baseSize * manualZoom);
+        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
+      } else {
+        // Auto: fit to container while respecting min/max
+        const cellW = Math.floor(maxWidth / state.width);
+        const cellH = Math.floor(maxHeight / state.height);
+        cellSize = Math.min(cellW, cellH);
+        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
+      }
 
       canvas.width = state.width * cellSize;
       canvas.height = state.height * cellSize;
+
+      updateZoomLabel();
+    }
+
+    function updateZoomLabel() {
+      const baseSize = 20;
+      const currentZoom = Math.round((cellSize / baseSize) * 100);
+      document.getElementById('zoom-label').textContent = `${currentZoom}%`;
     }
 
     // Render the grid
@@ -370,7 +474,7 @@
           }
 
           // Draw cell border
-          ctx.strokeStyle = '#ddd';
+          ctx.strokeStyle = darkMode ? '#444' : '#ddd';
           ctx.lineWidth = 1;
           ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
@@ -683,6 +787,43 @@
       }
     });
 
+    // Zoom controls
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      zoomMode = 'manual';
+      manualZoom = Math.min(MAX_ZOOM, manualZoom + ZOOM_STEP);
+      render();
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      zoomMode = 'manual';
+      manualZoom = Math.max(MIN_ZOOM, manualZoom - ZOOM_STEP);
+      render();
+    });
+
+    document.getElementById('btn-zoom-fit').addEventListener('click', () => {
+      if (zoomMode === 'fit') {
+        zoomMode = 'auto';
+      } else {
+        zoomMode = 'fit';
+      }
+      render();
+      // Update button state
+      document.getElementById('btn-zoom-fit').classList.toggle('active', zoomMode === 'fit');
+    });
+
+    // Dark mode toggle
+    function applyDarkMode() {
+      document.body.classList.toggle('dark-mode', darkMode);
+      document.getElementById('btn-dark-mode').textContent = darkMode ? 'Light' : 'Dark';
+      localStorage.setItem('darkMode', darkMode);
+    }
+
+    document.getElementById('btn-dark-mode').addEventListener('click', () => {
+      darkMode = !darkMode;
+      applyDarkMode();
+      render();
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       // Check for modal
@@ -715,9 +856,13 @@
 
       // Mode-specific shortcuts
       if (state.mode === 'display') {
-        if (e.key === ' ' || e.code === 'Space') {
+        if (e.key === ' ' || e.code === 'Space' || e.key === 'ArrowDown') {
           e.preventDefault();
           state.currentRow = (state.currentRow + 1) % state.height;
+          render();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          state.currentRow = (state.currentRow - 1 + state.height) % state.height;
           render();
         } else if (e.key === 'Escape') {
           state.mode = 'edit';
@@ -744,6 +889,7 @@
     window.addEventListener('resize', render);
 
     // Initialize
+    applyDarkMode();
     initGrid(20, 20);
     render();
   </script>
