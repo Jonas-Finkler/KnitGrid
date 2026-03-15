@@ -32,12 +32,21 @@ python -m http.server 8080
 ### Edit Mode
 - Click or drag to paint cells with the selected color
 - Color palette with add/select functionality
+- Switch between parts with Left/Right arrow keys
 - Undo/Redo support (Ctrl+Z / Ctrl+Y)
 
 ### Display Mode
 - Full pattern visible with current row highlighted
 - Other rows greyed out for easy reading
-- Navigate rows with Space key
+- Navigate rows with Space key (cycles through parts, then advances)
+- Switch between parts with Left/Right arrow keys
+
+### Parts (Multi-Panel Patterns)
+- Work on multiple pattern sections (e.g., front/back of a sock)
+- Load separate PNG files as different parts
+- Each part maintains independent row position
+- Switch between parts in both edit and display mode
+- Parts advance together when cycling through with Space
 
 ### File Operations
 - Save patterns as PNG images
@@ -48,7 +57,9 @@ python -m http.server 8080
 
 | Key | Action |
 |-----|--------|
-| Space | Next row (display mode) |
+| Space | Next part, then next row (display mode) |
+| Arrow Up/Down | Change current row (display mode) |
+| Arrow Left/Right | Switch between parts (edit & display mode) |
 | Esc | Exit display mode |
 | Enter | Enter display mode |
 | Ctrl+Z | Undo |

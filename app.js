@@ -71,10 +71,10 @@ function getCurrentPart() {
   return state.parts[state.currentPart];
 }
 
-// Get the grid to render (current part's grid in display mode with parts, otherwise main grid)
+// Get the grid to render (current part's grid if parts exist, otherwise main grid)
 function getDisplayGrid() {
   const part = getCurrentPart();
-  if (part && state.mode === 'display') {
+  if (part) {
     return { grid: part.grid, width: part.width, height: part.height, colors: part.colors };
   }
   return { grid: state.grid, width: state.width, height: state.height, colors: state.colors };
@@ -181,14 +181,20 @@ function updateUI() {
 
   // Status row
   const part = getCurrentPart();
-  if (part && state.mode === 'display') {
-    statusRow.textContent = `${part.name} (${state.currentPart + 1}/${state.parts.length}): Row ${part.currentRow + 1} of ${part.height}`;
+  if (part) {
+    if (state.mode === 'display') {
+      statusRow.textContent = `${part.name} (${state.currentPart + 1}/${state.parts.length}): Row ${part.currentRow + 1} of ${part.height}`;
+    } else {
+      // In edit mode, show which part is being edited
+      statusRow.textContent = `Editing: ${part.name} (${state.currentPart + 1}/${state.parts.length}) - ${part.width}×${part.height}`;
+    }
   } else {
     statusRow.textContent = `Row ${state.currentRow + 1} of ${state.height}`;
   }
 
   // Selected color info
-  const colorName = getColorName(state.colors[state.selectedColor]);
+  const colors = part ? part.colors : state.colors;
+  const colorName = getColorName(colors[state.selectedColor]);
   selectedInfo.textContent = `Selected: ${colorName}`;
 
   // Update palette
@@ -222,7 +228,11 @@ function getColorName(hex) {
 // Render color palette
 function renderPalette() {
   palette.innerHTML = '';
-  state.colors.forEach((color, index) => {
+  // Use current part's colors if editing a part, otherwise main colors
+  const part = getCurrentPart();
+  const colors = part ? part.colors : state.colors;
+
+  colors.forEach((color, index) => {
     const swatch = document.createElement('div');
     swatch.className = 'color-swatch' + (index === state.selectedColor ? ' selected' : '');
     swatch.style.backgroundColor = color;
@@ -241,9 +251,17 @@ function saveToHistory() {
     state.history = state.history.slice(0, state.historyIndex + 1);
   }
 
-  // Clone the grid
-  const gridCopy = state.grid.map(row => [...row]);
-  state.history.push(gridCopy);
+  // Clone the current editing grid (part or main)
+  const part = getCurrentPart();
+  const gridCopy = part
+    ? part.grid.map(row => [...row])
+    : state.grid.map(row => [...row]);
+
+  // Store which part this history entry is for
+  state.history.push({
+    grid: gridCopy,
+    partIndex: part ? state.currentPart : -1  // -1 means main grid
+  });
 
   // Limit history size
   if (state.history.length > 50) {
@@ -256,7 +274,15 @@ function saveToHistory() {
 function undo() {
   if (state.historyIndex > 0) {
     state.historyIndex--;
-    state.grid = state.history[state.historyIndex].map(row => [...row]);
+    const historyEntry = state.history[state.historyIndex];
+
+    if (historyEntry.partIndex >= 0 && historyEntry.partIndex < state.parts.length) {
+      // Restore part grid
+      state.parts[historyEntry.partIndex].grid = historyEntry.grid.map(row => [...row]);
+    } else {
+      // Restore main grid
+      state.grid = historyEntry.grid.map(row => [...row]);
+    }
     render();
   }
 }
@@ -264,7 +290,15 @@ function undo() {
 function redo() {
   if (state.historyIndex < state.history.length - 1) {
     state.historyIndex++;
-    state.grid = state.history[state.historyIndex].map(row => [...row]);
+    const historyEntry = state.history[state.historyIndex];
+
+    if (historyEntry.partIndex >= 0 && historyEntry.partIndex < state.parts.length) {
+      // Restore part grid
+      state.parts[historyEntry.partIndex].grid = historyEntry.grid.map(row => [...row]);
+    } else {
+      // Restore main grid
+      state.grid = historyEntry.grid.map(row => [...row]);
+    }
     render();
   }
 }
@@ -279,10 +313,22 @@ function getCellFromEvent(e) {
 
 // Paint a cell
 function paintCell(x, y) {
-  if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
-    if (state.grid[y][x] !== state.selectedColor) {
-      state.grid[y][x] = state.selectedColor;
-      render();
+  const part = getCurrentPart();
+  if (part) {
+    // Painting on a part
+    if (x >= 0 && x < part.width && y >= 0 && y < part.height) {
+      if (part.grid[y][x] !== state.selectedColor) {
+        part.grid[y][x] = state.selectedColor;
+        render();
+      }
+    }
+  } else {
+    // Painting on main grid
+    if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
+      if (state.grid[y][x] !== state.selectedColor) {
+        state.grid[y][x] = state.selectedColor;
+        render();
+      }
     }
   }
 }
@@ -564,7 +610,8 @@ document.getElementById('btn-part-add-current').addEventListener('click', () => 
     colors: [...state.colors],
     currentRow: 0
   });
-  state.currentPart = 0;
+  // Switch to the newly added part
+  state.currentPart = state.parts.length - 1;
 
   document.getElementById('part-name').value = '';
   renderPartsList();
@@ -629,7 +676,8 @@ partFileInput.addEventListener('change', (e) => {
         colors: newColors,
         currentRow: 0
       });
-      state.currentPart = 0;
+      // Switch to the newly added part
+      state.currentPart = state.parts.length - 1;
 
       document.getElementById('part-name').value = '';
       renderPartsList();
@@ -756,10 +804,25 @@ document.addEventListener('keydown', (e) => {
       render();
     }
   } else {
+    // Edit mode shortcuts
     if (e.key === 'Enter') {
       state.mode = 'display';
       state.currentPart = 0;
       render();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      // Switch to previous part in edit mode
+      if (state.parts.length > 0) {
+        state.currentPart = (state.currentPart - 1 + state.parts.length) % state.parts.length;
+        render();
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      // Switch to next part in edit mode
+      if (state.parts.length > 0) {
+        state.currentPart = (state.currentPart + 1) % state.parts.length;
+        render();
+      }
     }
   }
 

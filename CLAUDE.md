@@ -34,7 +34,12 @@ Parts allow working on multiple pattern sections (e.g., front/back of a sock) fr
 
 ### Display Mode vs Edit Mode
 - **Edit mode**: Click/drag to paint cells, manage colors, full pattern visible
+  - Can switch between parts with Left/Right arrows
+  - When editing a part, that part's grid and colors are used
+  - Status bar shows which part is being edited
 - **Display mode**: Shows one row highlighted, others greyed out (60% opacity), navigate with keyboard
+  - Can switch between parts with Left/Right arrows
+  - Each part shows its own current row
 
 ### Zoom System
 Three zoom modes:
@@ -91,12 +96,13 @@ When loading, unique colors are extracted to build the palette.
 ## Important Implementation Details
 
 ### Rendering with Parts
-When parts are defined and in display mode:
+When parts are defined (in both edit and display mode):
 - `getDisplayGrid()` returns the current part's grid/colors instead of main grid
 - Canvas size adapts to current part's dimensions
 - Each part maintains its own `currentRow` - rendering uses `part.currentRow` not `state.currentRow`
-- Main grid is always used for editing (parts are read-only in display)
-- When Space is pressed after cycling all parts, ALL parts' `currentRow` values increment together
+- **Parts are now fully editable** - painting modifies the current part's grid
+- Part colors are shown in the palette when editing a part
+- When Space is pressed after cycling all parts (display mode), ALL parts' `currentRow` values increment together
 
 ### Canvas Sizing
 Canvas dimensions are recalculated on every render based on:
@@ -106,6 +112,8 @@ Canvas dimensions are recalculated on every render based on:
 
 ### History/Undo
 - History is saved before each paint stroke (on mousedown)
+- Each history entry stores the grid and which part it belongs to (or -1 for main grid)
+- Undo/redo restores to the appropriate grid (part or main)
 - Limited to 50 states to prevent memory issues
 - History is cleared on new project or file load
 
