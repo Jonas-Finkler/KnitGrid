@@ -19,11 +19,13 @@ Everything is in `index.html` intentionally - makes it easy to copy, share, and 
 ### Parts System (Multi-Panel Patterns)
 Parts allow working on multiple pattern sections (e.g., front/back of a sock) from **separate PNG files**:
 
-- Each part stores: `{name, grid, width, height, colors}`
+- Each part stores: `{name, grid, width, height, colors, currentRow}`
 - Parts are independent patterns, not row ranges of a single pattern
-- In display mode, Space cycles through all parts before advancing to next row
-- Row count uses `Math.min(...parts.map(p => p.height))` to keep parts synchronized
-- User wanted this specifically for socks where front and back are separate files
+- **Each part tracks its own current row independently** - you might be on row 5 of the front but row 3 of the back
+- In display mode, Space cycles through all parts, then **increments the row for ALL parts simultaneously**
+- Arrow Up/Down changes only the current part's row
+- Arrow Left/Right switches between parts without changing rows
+- User wanted this specifically for socks where front and back are separate files at potentially different progress points
 
 ### Display Mode vs Edit Mode
 - **Edit mode**: Click/drag to paint cells, manage colors, full pattern visible
@@ -48,11 +50,11 @@ state = {
   width, height,      // Main grid dimensions
   colors: [],         // Palette array of hex strings
   selectedColor: 1,   // Index into colors array
-  currentRow: 0,      // Current row in display mode
+  currentRow: 0,      // Current row in display mode (when no parts)
   mode: 'edit',       // 'edit' or 'display'
   history: [],        // Undo stack (max 50 states)
   historyIndex: -1,   // Current position in history
-  parts: [],          // Array of {name, grid, width, height, colors}
+  parts: [],          // Array of {name, grid, width, height, colors, currentRow}
   currentPart: 0      // Which part is currently shown
 }
 ```
@@ -61,9 +63,9 @@ state = {
 
 | Key | Mode | Action |
 |-----|------|--------|
-| Space | Display | Next part, then next row |
-| Arrow Up/Down | Display | Navigate rows |
-| Arrow Left/Right | Display | Switch parts |
+| Space | Display | Cycle to next part; after last part, increment row for ALL parts |
+| Arrow Up/Down | Display | Change current part's row only |
+| Arrow Left/Right | Display | Switch between parts |
 | Esc | Display | Return to edit mode |
 | Enter | Edit | Enter display mode |
 | 1-9 | Any | Quick select color |
@@ -87,7 +89,9 @@ When loading, unique colors are extracted to build the palette.
 When parts are defined and in display mode:
 - `getDisplayGrid()` returns the current part's grid/colors instead of main grid
 - Canvas size adapts to current part's dimensions
+- Each part maintains its own `currentRow` - rendering uses `part.currentRow` not `state.currentRow`
 - Main grid is always used for editing (parts are read-only in display)
+- When Space is pressed after cycling all parts, ALL parts' `currentRow` values increment together
 
 ### Canvas Sizing
 Canvas dimensions are recalculated on every render based on:

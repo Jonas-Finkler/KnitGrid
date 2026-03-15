@@ -480,7 +480,7 @@
       mode: 'edit',
       history: [],
       historyIndex: -1,
-      // Parts: each part has {name, grid, width, height, colors} - separate patterns
+      // Parts: each part has {name, grid, width, height, colors, currentRow} - separate patterns with independent rows
       parts: [],
       currentPart: 0
     };
@@ -589,10 +589,22 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Clamp currentRow to valid range
-      const viewHeight = getViewHeight();
-      if (state.currentRow >= viewHeight) {
-        state.currentRow = viewHeight - 1;
+      // Get the current row (from part or main state)
+      const part = getCurrentPart();
+      let displayRow = state.currentRow;
+      if (part && state.mode === 'display') {
+        displayRow = part.currentRow;
+        // Clamp to valid range
+        if (displayRow >= part.height) {
+          part.currentRow = displayRow = part.height - 1;
+        }
+      } else {
+        // Clamp currentRow to valid range
+        const viewHeight = getViewHeight();
+        if (state.currentRow >= viewHeight) {
+          state.currentRow = viewHeight - 1;
+        }
+        displayRow = state.currentRow;
       }
 
       for (let y = 0; y < display.height; y++) {
@@ -605,7 +617,7 @@
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 
           // Apply grey overlay in display mode for non-current rows
-          if (state.mode === 'display' && y !== state.currentRow) {
+          if (state.mode === 'display' && y !== displayRow) {
             ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
             ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
           }
@@ -623,7 +635,7 @@
         ctx.lineWidth = 3;
         ctx.strokeRect(
           1,
-          state.currentRow * cellSize + 1,
+          displayRow * cellSize + 1,
           display.width * cellSize - 2,
           cellSize - 2
         );
@@ -640,9 +652,8 @@
 
       // Status row
       const part = getCurrentPart();
-      const viewHeight = getViewHeight();
       if (part && state.mode === 'display') {
-        statusRow.textContent = `${part.name} (${state.currentPart + 1}/${state.parts.length}): Row ${state.currentRow + 1} of ${viewHeight}`;
+        statusRow.textContent = `${part.name} (${state.currentPart + 1}/${state.parts.length}): Row ${part.currentRow + 1} of ${part.height}`;
       } else {
         statusRow.textContent = `Row ${state.currentRow + 1} of ${state.height}`;
       }
@@ -975,16 +986,17 @@
       render();
     });
 
-    // Advance in display mode: cycle parts, then advance row
+    // Advance in display mode: cycle parts, then advance row for all parts together
     function advanceInDisplayMode() {
       if (state.parts.length > 0) {
         // Cycle to next part
         state.currentPart++;
         if (state.currentPart >= state.parts.length) {
-          // Wrapped around - advance row
+          // Wrapped around - advance row for ALL parts
           state.currentPart = 0;
-          const viewHeight = getViewHeight();
-          state.currentRow = (state.currentRow + 1) % viewHeight;
+          state.parts.forEach(part => {
+            part.currentRow = (part.currentRow + 1) % part.height;
+          });
         }
       } else {
         // No parts - just advance row
@@ -1020,7 +1032,8 @@
         grid: state.grid.map(row => [...row]),
         width: state.width,
         height: state.height,
-        colors: [...state.colors]
+        colors: [...state.colors],
+        currentRow: 0
       });
       state.currentPart = 0;
 
@@ -1084,7 +1097,8 @@
             grid: newGrid,
             width: img.width,
             height: img.height,
-            colors: newColors
+            colors: newColors,
+            currentRow: 0
           });
           state.currentPart = 0;
 
@@ -1176,14 +1190,23 @@
           advanceInDisplayMode();
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
-          // Arrow down always advances row
-          const viewHeight = getViewHeight();
-          state.currentRow = (state.currentRow + 1) % viewHeight;
+          // Arrow down advances current part's row (or main row if no parts)
+          const part = getCurrentPart();
+          if (part) {
+            part.currentRow = (part.currentRow + 1) % part.height;
+          } else {
+            state.currentRow = (state.currentRow + 1) % state.height;
+          }
           render();
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
-          const viewHeight = getViewHeight();
-          state.currentRow = (state.currentRow - 1 + viewHeight) % viewHeight;
+          // Arrow up decreases current part's row (or main row if no parts)
+          const part = getCurrentPart();
+          if (part) {
+            part.currentRow = (part.currentRow - 1 + part.height) % part.height;
+          } else {
+            state.currentRow = (state.currentRow - 1 + state.height) % state.height;
+          }
           render();
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
