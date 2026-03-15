@@ -349,7 +349,7 @@
       font-weight: 500;
     }
 
-    .part-item .part-rows {
+    .part-item .part-info {
       color: var(--text-secondary);
       font-size: 13px;
     }
@@ -367,14 +367,7 @@
 
     .part-add-form .form-group {
       margin-bottom: 0;
-    }
-
-    .part-add-form .form-group.name {
       flex: 1;
-    }
-
-    .part-add-form .form-group.rows {
-      width: 80px;
     }
 
     .part-indicator {
@@ -450,25 +443,18 @@
     <div class="modal wide">
       <h2>Pattern Parts</h2>
       <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 14px;">
-        Split your pattern into parts (e.g., front/back of a sock). In display mode, Space cycles through parts before advancing to the next row.
+        Load multiple pattern files (e.g., front/back of a sock). In display mode, Space cycles through parts before advancing to the next row.
       </p>
       <div class="parts-list" id="parts-list">
-        <div class="parts-list-empty">No parts defined. Add parts below or use the full pattern.</div>
+        <div class="parts-list-empty">No parts loaded. Add the current pattern or load from files.</div>
       </div>
       <div class="part-add-form">
-        <div class="form-group name">
-          <label for="part-name">Name</label>
+        <div class="form-group">
+          <label for="part-name">Part name</label>
           <input type="text" id="part-name" placeholder="e.g., Front">
         </div>
-        <div class="form-group rows">
-          <label for="part-start">From row</label>
-          <input type="number" id="part-start" value="1" min="1">
-        </div>
-        <div class="form-group rows">
-          <label for="part-end">To row</label>
-          <input type="number" id="part-end" value="10" min="1">
-        </div>
-        <button id="btn-part-add" class="primary" style="margin-bottom: 0;">Add</button>
+        <button id="btn-part-add-current" class="primary" style="margin-bottom: 0;">Add Current</button>
+        <button id="btn-part-load-file" style="margin-bottom: 0;">Load PNG</button>
       </div>
       <div class="button-row">
         <button id="btn-parts-clear">Clear All</button>
@@ -479,6 +465,7 @@
 
   <!-- Hidden inputs -->
   <input type="file" id="file-input" accept="image/png,image/*">
+  <input type="file" id="part-file-input" accept="image/png,image/*">
   <input type="color" id="color-picker">
 
   <script>
@@ -493,7 +480,7 @@
       mode: 'edit',
       history: [],
       historyIndex: -1,
-      // Parts: each part has {name, startRow, endRow} (1-indexed for UI, 0-indexed internally)
+      // Parts: each part has {name, grid, width, height, colors} - separate patterns
       parts: [],
       currentPart: 0
     };
@@ -541,105 +528,86 @@
       saveToHistory();
     }
 
-    // Calculate cell size and canvas dimensions
-    function calculateCanvasSize() {
-      const container = document.querySelector('.canvas-container');
-      const maxWidth = container.clientWidth - 40;
-      const maxHeight = container.clientHeight - 40;
-
-      if (zoomMode === 'fit') {
-        // Fit width: make pattern span full width
-        cellSize = Math.floor(maxWidth / state.width);
-        cellSize = Math.max(MIN_CELL_SIZE, cellSize);
-      } else if (zoomMode === 'manual') {
-        // Manual zoom: use fixed cell size based on zoom level
-        const baseSize = 20;
-        cellSize = Math.round(baseSize * manualZoom);
-        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
-      } else {
-        // Auto: fit to container while respecting min/max
-        const cellW = Math.floor(maxWidth / state.width);
-        const cellH = Math.floor(maxHeight / state.height);
-        cellSize = Math.min(cellW, cellH);
-        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
-      }
-
-      canvas.width = state.width * cellSize;
-      canvas.height = state.height * cellSize;
-
-      updateZoomLabel();
-    }
-
     function updateZoomLabel() {
       const baseSize = 20;
       const currentZoom = Math.round((cellSize / baseSize) * 100);
       document.getElementById('zoom-label').textContent = `${currentZoom}%`;
     }
 
-    // Get current part info (if parts are defined)
-    function getCurrentPartInfo() {
+    // Get current part (if parts are defined and in display mode)
+    function getCurrentPart() {
       if (state.parts.length === 0) {
         return null;
       }
       return state.parts[state.currentPart];
     }
 
-    // Get the actual row to display based on currentRow and current part
-    function getDisplayRow() {
-      const part = getCurrentPartInfo();
-      if (!part) {
-        return state.currentRow;
+    // Get the grid to render (current part's grid in display mode with parts, otherwise main grid)
+    function getDisplayGrid() {
+      const part = getCurrentPart();
+      if (part && state.mode === 'display') {
+        return { grid: part.grid, width: part.width, height: part.height, colors: part.colors };
       }
-      // currentRow is the logical row (0-indexed), map it to the part's range
-      const partHeight = part.endRow - part.startRow + 1;
-      const rowInPart = state.currentRow % partHeight;
-      return part.startRow + rowInPart;
+      return { grid: state.grid, width: state.width, height: state.height, colors: state.colors };
     }
 
-    // Get number of rows in current view
+    // Get number of rows in current view (minimum across all parts, or main grid height)
     function getViewHeight() {
-      const part = getCurrentPartInfo();
-      if (!part) {
+      if (state.parts.length === 0) {
         return state.height;
       }
-      return part.endRow - part.startRow + 1;
+      // Use the minimum height across all parts so rows stay in sync
+      return Math.min(...state.parts.map(p => p.height));
     }
 
     // Render the grid
     function render() {
-      calculateCanvasSize();
+      const display = getDisplayGrid();
+
+      // Recalculate canvas size for current display
+      const container = document.querySelector('.canvas-container');
+      const maxWidth = container.clientWidth - 40;
+      const maxHeight = container.clientHeight - 40;
+
+      if (zoomMode === 'fit') {
+        cellSize = Math.floor(maxWidth / display.width);
+        cellSize = Math.max(MIN_CELL_SIZE, cellSize);
+      } else if (zoomMode === 'manual') {
+        const baseSize = 20;
+        cellSize = Math.round(baseSize * manualZoom);
+        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
+      } else {
+        const cellW = Math.floor(maxWidth / display.width);
+        const cellH = Math.floor(maxHeight / display.height);
+        cellSize = Math.min(cellW, cellH);
+        cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, cellSize));
+      }
+
+      canvas.width = display.width * cellSize;
+      canvas.height = display.height * cellSize;
+      updateZoomLabel();
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const part = getCurrentPartInfo();
-      const displayRow = getDisplayRow();
+      // Clamp currentRow to valid range
+      const viewHeight = getViewHeight();
+      if (state.currentRow >= viewHeight) {
+        state.currentRow = viewHeight - 1;
+      }
 
-      for (let y = 0; y < state.height; y++) {
-        for (let x = 0; x < state.width; x++) {
-          const colorIndex = state.grid[y][x];
-          const color = state.colors[colorIndex] || '#FFFFFF';
+      for (let y = 0; y < display.height; y++) {
+        for (let x = 0; x < display.width; x++) {
+          const colorIndex = display.grid[y] ? display.grid[y][x] : 0;
+          const color = display.colors[colorIndex] || '#FFFFFF';
 
           // Draw cell
           ctx.fillStyle = color;
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 
-          // Apply grey overlay in display mode
-          if (state.mode === 'display') {
-            let greyOut = false;
-            if (part) {
-              // Grey out rows outside current part, or not the current row within part
-              if (y < part.startRow || y > part.endRow || y !== displayRow) {
-                greyOut = true;
-              }
-            } else {
-              // No parts: grey out non-current rows
-              if (y !== state.currentRow) {
-                greyOut = true;
-              }
-            }
-            if (greyOut) {
-              ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
-              ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-            }
+          // Apply grey overlay in display mode for non-current rows
+          if (state.mode === 'display' && y !== state.currentRow) {
+            ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
           }
 
           // Draw cell border
@@ -651,13 +619,12 @@
 
       // Draw current row highlight in display mode
       if (state.mode === 'display') {
-        const highlightRow = part ? displayRow : state.currentRow;
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 3;
         ctx.strokeRect(
           1,
-          highlightRow * cellSize + 1,
-          state.width * cellSize - 2,
+          state.currentRow * cellSize + 1,
+          display.width * cellSize - 2,
           cellSize - 2
         );
       }
@@ -672,11 +639,10 @@
       modeIndicator.classList.toggle('display-mode', state.mode === 'display');
 
       // Status row
-      const part = getCurrentPartInfo();
+      const part = getCurrentPart();
+      const viewHeight = getViewHeight();
       if (part && state.mode === 'display') {
-        const partHeight = part.endRow - part.startRow + 1;
-        const rowInPart = (state.currentRow % partHeight) + 1;
-        statusRow.textContent = `${part.name}: Row ${rowInPart} of ${partHeight} (Row ${state.currentRow + 1})`;
+        statusRow.textContent = `${part.name} (${state.currentPart + 1}/${state.parts.length}): Row ${state.currentRow + 1} of ${viewHeight}`;
       } else {
         statusRow.textContent = `Row ${state.currentRow + 1} of ${state.height}`;
       }
@@ -1044,49 +1010,93 @@
       render();
     });
 
-    document.getElementById('btn-part-add').addEventListener('click', addPart);
+    // Add current pattern as a part
+    document.getElementById('btn-part-add-current').addEventListener('click', () => {
+      const name = document.getElementById('part-name').value.trim() || `Part ${state.parts.length + 1}`;
 
-    // Allow Enter key in part form
-    document.getElementById('part-name').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') addPart();
-    });
-
-    function addPart() {
-      const name = document.getElementById('part-name').value.trim();
-      const startRow = parseInt(document.getElementById('part-start').value) - 1; // Convert to 0-indexed
-      const endRow = parseInt(document.getElementById('part-end').value) - 1;
-
-      if (!name) {
-        alert('Please enter a part name');
-        return;
-      }
-
-      if (isNaN(startRow) || isNaN(endRow) || startRow < 0 || endRow < 0) {
-        alert('Please enter valid row numbers');
-        return;
-      }
-
-      if (startRow > endRow) {
-        alert('Start row must be less than or equal to end row');
-        return;
-      }
-
-      if (endRow >= state.height) {
-        alert(`End row cannot exceed pattern height (${state.height})`);
-        return;
-      }
-
-      state.parts.push({ name, startRow, endRow });
+      // Clone the current grid
+      state.parts.push({
+        name,
+        grid: state.grid.map(row => [...row]),
+        width: state.width,
+        height: state.height,
+        colors: [...state.colors]
+      });
       state.currentPart = 0;
 
-      // Clear form
       document.getElementById('part-name').value = '';
-      document.getElementById('part-start').value = '1';
-      document.getElementById('part-end').value = '10';
-
       renderPartsList();
       render();
-    }
+    });
+
+    // Load a PNG file as a part
+    const partFileInput = document.getElementById('part-file-input');
+
+    document.getElementById('btn-part-load-file').addEventListener('click', () => {
+      partFileInput.click();
+    });
+
+    partFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const partName = document.getElementById('part-name').value.trim() || file.name.replace(/\.[^.]+$/, '');
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (event) => {
+        img.onload = () => {
+          // Create temp canvas to read pixels
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.drawImage(img, 0, 0);
+
+          const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+          const pixels = imageData.data;
+
+          // Extract unique colors and build grid
+          const colorMap = new Map();
+          const newColors = [];
+          const newGrid = [];
+
+          for (let y = 0; y < img.height; y++) {
+            newGrid[y] = [];
+            for (let x = 0; x < img.width; x++) {
+              const i = (y * img.width + x) * 4;
+              const r = pixels[i];
+              const g = pixels[i + 1];
+              const b = pixels[i + 2];
+              const hex = rgbToHex(r, g, b);
+
+              if (!colorMap.has(hex)) {
+                colorMap.set(hex, newColors.length);
+                newColors.push(hex);
+              }
+              newGrid[y][x] = colorMap.get(hex);
+            }
+          }
+
+          // Add as part
+          state.parts.push({
+            name: partName,
+            grid: newGrid,
+            width: img.width,
+            height: img.height,
+            colors: newColors
+          });
+          state.currentPart = 0;
+
+          document.getElementById('part-name').value = '';
+          renderPartsList();
+          render();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+      partFileInput.value = '';
+    });
 
     function removePart(index) {
       state.parts.splice(index, 1);
@@ -1100,14 +1110,14 @@
     function renderPartsList() {
       const list = document.getElementById('parts-list');
       if (state.parts.length === 0) {
-        list.innerHTML = '<div class="parts-list-empty">No parts defined. Add parts below or use the full pattern.</div>';
+        list.innerHTML = '<div class="parts-list-empty">No parts loaded. Add the current pattern or load from files.</div>';
         return;
       }
 
       list.innerHTML = state.parts.map((part, i) => `
         <div class="part-item">
           <span class="part-name">${escapeHtml(part.name)}</span>
-          <span class="part-rows">Rows ${part.startRow + 1}-${part.endRow + 1}</span>
+          <span class="part-info">${part.width}x${part.height}</span>
           <button onclick="removePart(${i})">Remove</button>
         </div>
       `).join('');
