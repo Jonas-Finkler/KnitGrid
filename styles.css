@@ -288,8 +288,9 @@ body {
   background: #0056b3;
 }
 
-/* Hidden file input */
-#file-input {
+/* Hidden file inputs */
+#file-input,
+#part-file-input {
   display: none;
 }
 
