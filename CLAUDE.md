@@ -6,15 +6,20 @@ A browser-based knitting pattern tool for displaying pixel-based patterns row by
 
 ## Technology Stack
 
-- **Single HTML file** (`index.html`) with embedded CSS and JavaScript
+- **Vanilla HTML/CSS/JavaScript** - no frameworks or build step
 - **No dependencies** - works offline, just open in browser
 - **HTML Canvas** for grid rendering
 - **Nix Flake** for reproducible dev environment (`nix run .#serve` / `nix run .#open`)
 
 ## Key Design Decisions
 
-### Single File Architecture
-Everything is in `index.html` intentionally - makes it easy to copy, share, and use offline without any build process.
+### Simple File Structure
+The application is split into three files for better organization:
+- `index.html` - HTML structure and markup
+- `styles.css` - All CSS styling and theming
+- `app.js` - All JavaScript logic
+
+Still easy to copy, share, and use offline without any build process - just keep the three files together.
 
 ### Parts System (Multi-Panel Patterns)
 Parts allow working on multiple pattern sections (e.g., front/back of a sock) from **separate PNG files**:
@@ -110,7 +115,9 @@ Canvas dimensions are recalculated on every render based on:
 knit-pattern-tool/
 ├── flake.nix       # Nix flake (dev shell, serve/open apps)
 ├── flake.lock      # Auto-generated lockfile
-├── index.html      # Complete application
+├── index.html      # HTML structure and markup
+├── styles.css      # CSS styling and theming
+├── app.js          # JavaScript application logic
 ├── README.md       # User documentation
 ├── CLAUDE.md       # This file - dev notes
 └── .gitignore      # Ignores: result, .direnv
