@@ -142,6 +142,9 @@ body {
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 28px;
+  z-index: 10;
 }
 
 .color-swatch {
@@ -195,6 +198,9 @@ body {
   color: var(--status-text);
   font-size: 13px;
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .status-bar kbd {
