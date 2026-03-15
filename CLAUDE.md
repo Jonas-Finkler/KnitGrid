@@ -14,12 +14,25 @@ A browser-based knitting pattern tool for displaying pixel-based patterns row by
 ## Key Design Decisions
 
 ### Simple File Structure
-The application is split into three files for better organization:
+The application is contained in three files for easy sharing and offline use:
 - `index.html` - HTML structure and markup
 - `styles.css` - All CSS styling and theming
 - `app.js` - All JavaScript logic
 
-Still easy to copy, share, and use offline without any build process - just keep the three files together.
+### Code Organization
+The JavaScript is organized into clearly labeled sections:
+- **STATE** - Core state object and mutable variables
+- **DOM REFERENCES** - Cached element references
+- **UTILITIES** - Helper functions (color conversion, escaping)
+- **STATE HELPERS** - Functions to query/modify state
+- **HISTORY** - Undo/redo system
+- **RENDERING** - Canvas drawing and zoom calculations
+- **UI UPDATES** - Status bar, palette, mode indicator
+- **PAINTING** - Cell painting logic
+- **FILE I/O** - PNG save/load
+- **PARTS MANAGEMENT** - Multi-panel pattern handling
+- **EVENT HANDLERS** - All input event setup
+- **INITIALIZATION** - Startup code
 
 ### Parts System (Multi-Panel Patterns)
 Parts allow working on multiple pattern sections (e.g., front/back of a sock) from **separate PNG files**:
@@ -110,6 +123,12 @@ Canvas dimensions are recalculated on every render based on:
 - Current display grid (main or part)
 - Container size
 
+### Auto-Scroll in Display Mode
+When navigating rows in display mode, the view automatically scrolls to keep the current row centered:
+- `scrollToCurrentRow()` calculates the scroll position to center the highlighted row
+- Respects container boundaries (won't scroll past top or bottom)
+- Called after every render in display mode
+
 ### History/Undo
 - History is saved before each paint stroke (on mousedown)
 - Each history entry stores the grid and which part it belongs to (or -1 for main grid)
@@ -121,11 +140,11 @@ Canvas dimensions are recalculated on every render based on:
 
 ```
 knit-pattern-tool/
-├── flake.nix       # Nix flake (dev shell, serve/open apps)
-├── flake.lock      # Auto-generated lockfile
 ├── index.html      # HTML structure and markup
 ├── styles.css      # CSS styling and theming
-├── app.js          # JavaScript application logic
+├── app.js          # JavaScript application logic (~500 lines)
+├── flake.nix       # Nix flake (dev shell, serve/open apps)
+├── flake.lock      # Auto-generated lockfile
 ├── README.md       # User documentation
 ├── CLAUDE.md       # This file - dev notes
 └── .gitignore      # Ignores: result, .direnv
