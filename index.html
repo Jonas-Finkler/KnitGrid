@@ -300,6 +300,92 @@
       opacity: 0;
       pointer-events: none;
     }
+
+    /* Parts modal */
+    .modal.wide {
+      min-width: 400px;
+      max-width: 500px;
+    }
+
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-color-dark);
+      border-radius: 4px;
+      font-size: 14px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .parts-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    .parts-list-empty {
+      padding: 16px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .part-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .part-item:last-child {
+      border-bottom: none;
+    }
+
+    .part-item .part-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .part-item .part-rows {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .part-item button {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+
+    .part-add-form {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .part-add-form .form-group {
+      margin-bottom: 0;
+    }
+
+    .part-add-form .form-group.name {
+      flex: 1;
+    }
+
+    .part-add-form .form-group.rows {
+      width: 80px;
+    }
+
+    .part-indicator {
+      font-weight: bold;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #17a2b8;
+      color: #fff;
+      font-size: 13px;
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
@@ -308,6 +394,7 @@
     <button id="btn-load">Load</button>
     <button id="btn-save">Save</button>
     <button id="btn-display">Display</button>
+    <button id="btn-parts">Parts</button>
     <div class="separator"></div>
     <div class="zoom-controls">
       <button id="btn-zoom-out" title="Zoom out">-</button>
@@ -334,8 +421,9 @@
     <span id="status-row">Row 1 of 20</span>
     <span><kbd>Ctrl+Z</kbd> Undo</span>
     <span><kbd>Ctrl+Y</kbd> Redo</span>
-    <span><kbd>Space</kbd>/<kbd>Arrow</kbd> Navigate Rows</span>
-    <span><kbd>Esc</kbd> Edit Mode</span>
+    <span><kbd>Space</kbd> Next</span>
+    <span><kbd>Arrows</kbd> Navigate</span>
+    <span><kbd>Esc</kbd> Edit</span>
   </div>
 
   <!-- New Project Modal -->
@@ -357,6 +445,38 @@
     </div>
   </div>
 
+  <!-- Parts Modal -->
+  <div class="modal-overlay" id="modal-parts">
+    <div class="modal wide">
+      <h2>Pattern Parts</h2>
+      <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 14px;">
+        Split your pattern into parts (e.g., front/back of a sock). In display mode, Space cycles through parts before advancing to the next row.
+      </p>
+      <div class="parts-list" id="parts-list">
+        <div class="parts-list-empty">No parts defined. Add parts below or use the full pattern.</div>
+      </div>
+      <div class="part-add-form">
+        <div class="form-group name">
+          <label for="part-name">Name</label>
+          <input type="text" id="part-name" placeholder="e.g., Front">
+        </div>
+        <div class="form-group rows">
+          <label for="part-start">From row</label>
+          <input type="number" id="part-start" value="1" min="1">
+        </div>
+        <div class="form-group rows">
+          <label for="part-end">To row</label>
+          <input type="number" id="part-end" value="10" min="1">
+        </div>
+        <button id="btn-part-add" class="primary" style="margin-bottom: 0;">Add</button>
+      </div>
+      <div class="button-row">
+        <button id="btn-parts-clear">Clear All</button>
+        <button id="btn-parts-close" class="primary">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden inputs -->
   <input type="file" id="file-input" accept="image/png,image/*">
   <input type="color" id="color-picker">
@@ -372,7 +492,10 @@
       currentRow: 0,
       mode: 'edit',
       history: [],
-      historyIndex: -1
+      historyIndex: -1,
+      // Parts: each part has {name, startRow, endRow} (1-indexed for UI, 0-indexed internally)
+      parts: [],
+      currentPart: 0
     };
 
     // DOM elements
@@ -453,10 +576,42 @@
       document.getElementById('zoom-label').textContent = `${currentZoom}%`;
     }
 
+    // Get current part info (if parts are defined)
+    function getCurrentPartInfo() {
+      if (state.parts.length === 0) {
+        return null;
+      }
+      return state.parts[state.currentPart];
+    }
+
+    // Get the actual row to display based on currentRow and current part
+    function getDisplayRow() {
+      const part = getCurrentPartInfo();
+      if (!part) {
+        return state.currentRow;
+      }
+      // currentRow is the logical row (0-indexed), map it to the part's range
+      const partHeight = part.endRow - part.startRow + 1;
+      const rowInPart = state.currentRow % partHeight;
+      return part.startRow + rowInPart;
+    }
+
+    // Get number of rows in current view
+    function getViewHeight() {
+      const part = getCurrentPartInfo();
+      if (!part) {
+        return state.height;
+      }
+      return part.endRow - part.startRow + 1;
+    }
+
     // Render the grid
     function render() {
       calculateCanvasSize();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const part = getCurrentPartInfo();
+      const displayRow = getDisplayRow();
 
       for (let y = 0; y < state.height; y++) {
         for (let x = 0; x < state.width; x++) {
@@ -467,10 +622,24 @@
           ctx.fillStyle = color;
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 
-          // Apply grey overlay in display mode for non-current rows
-          if (state.mode === 'display' && y !== state.currentRow) {
-            ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
-            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          // Apply grey overlay in display mode
+          if (state.mode === 'display') {
+            let greyOut = false;
+            if (part) {
+              // Grey out rows outside current part, or not the current row within part
+              if (y < part.startRow || y > part.endRow || y !== displayRow) {
+                greyOut = true;
+              }
+            } else {
+              // No parts: grey out non-current rows
+              if (y !== state.currentRow) {
+                greyOut = true;
+              }
+            }
+            if (greyOut) {
+              ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
+              ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+            }
           }
 
           // Draw cell border
@@ -482,11 +651,12 @@
 
       // Draw current row highlight in display mode
       if (state.mode === 'display') {
+        const highlightRow = part ? displayRow : state.currentRow;
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 3;
         ctx.strokeRect(
           1,
-          state.currentRow * cellSize + 1,
+          highlightRow * cellSize + 1,
           state.width * cellSize - 2,
           cellSize - 2
         );
@@ -502,7 +672,14 @@
       modeIndicator.classList.toggle('display-mode', state.mode === 'display');
 
       // Status row
-      statusRow.textContent = `Row ${state.currentRow + 1} of ${state.height}`;
+      const part = getCurrentPartInfo();
+      if (part && state.mode === 'display') {
+        const partHeight = part.endRow - part.startRow + 1;
+        const rowInPart = (state.currentRow % partHeight) + 1;
+        statusRow.textContent = `${part.name}: Row ${rowInPart} of ${partHeight} (Row ${state.currentRow + 1})`;
+      } else {
+        statusRow.textContent = `Row ${state.currentRow + 1} of ${state.height}`;
+      }
 
       // Selected color info
       const colorName = getColorName(state.colors[state.selectedColor]);
@@ -515,6 +692,10 @@
       const btnDisplay = document.getElementById('btn-display');
       btnDisplay.textContent = state.mode === 'edit' ? 'Display' : 'Edit';
       btnDisplay.classList.toggle('active', state.mode === 'display');
+
+      // Update parts button
+      const btnParts = document.getElementById('btn-parts');
+      btnParts.classList.toggle('active', state.parts.length > 0);
     }
 
     // Get a readable color name
@@ -665,6 +846,8 @@
       state.colors = ['#FFFFFF', '#000000'];
       state.selectedColor = 1;
       state.mode = 'edit';
+      state.parts = [];
+      state.currentPart = 0;
       render();
       document.getElementById('modal-new').classList.remove('active');
     });
@@ -724,6 +907,8 @@
           state.mode = 'edit';
           state.history = [];
           state.historyIndex = -1;
+          state.parts = [];
+          state.currentPart = 0;
           saveToHistory();
           render();
         };
@@ -824,14 +1009,134 @@
       render();
     });
 
+    // Advance in display mode: cycle parts, then advance row
+    function advanceInDisplayMode() {
+      if (state.parts.length > 0) {
+        // Cycle to next part
+        state.currentPart++;
+        if (state.currentPart >= state.parts.length) {
+          // Wrapped around - advance row
+          state.currentPart = 0;
+          const viewHeight = getViewHeight();
+          state.currentRow = (state.currentRow + 1) % viewHeight;
+        }
+      } else {
+        // No parts - just advance row
+        state.currentRow = (state.currentRow + 1) % state.height;
+      }
+      render();
+    }
+
+    // Parts modal
+    document.getElementById('btn-parts').addEventListener('click', () => {
+      renderPartsList();
+      document.getElementById('modal-parts').classList.add('active');
+    });
+
+    document.getElementById('btn-parts-close').addEventListener('click', () => {
+      document.getElementById('modal-parts').classList.remove('active');
+    });
+
+    document.getElementById('btn-parts-clear').addEventListener('click', () => {
+      state.parts = [];
+      state.currentPart = 0;
+      renderPartsList();
+      render();
+    });
+
+    document.getElementById('btn-part-add').addEventListener('click', addPart);
+
+    // Allow Enter key in part form
+    document.getElementById('part-name').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addPart();
+    });
+
+    function addPart() {
+      const name = document.getElementById('part-name').value.trim();
+      const startRow = parseInt(document.getElementById('part-start').value) - 1; // Convert to 0-indexed
+      const endRow = parseInt(document.getElementById('part-end').value) - 1;
+
+      if (!name) {
+        alert('Please enter a part name');
+        return;
+      }
+
+      if (isNaN(startRow) || isNaN(endRow) || startRow < 0 || endRow < 0) {
+        alert('Please enter valid row numbers');
+        return;
+      }
+
+      if (startRow > endRow) {
+        alert('Start row must be less than or equal to end row');
+        return;
+      }
+
+      if (endRow >= state.height) {
+        alert(`End row cannot exceed pattern height (${state.height})`);
+        return;
+      }
+
+      state.parts.push({ name, startRow, endRow });
+      state.currentPart = 0;
+
+      // Clear form
+      document.getElementById('part-name').value = '';
+      document.getElementById('part-start').value = '1';
+      document.getElementById('part-end').value = '10';
+
+      renderPartsList();
+      render();
+    }
+
+    function removePart(index) {
+      state.parts.splice(index, 1);
+      if (state.currentPart >= state.parts.length) {
+        state.currentPart = Math.max(0, state.parts.length - 1);
+      }
+      renderPartsList();
+      render();
+    }
+
+    function renderPartsList() {
+      const list = document.getElementById('parts-list');
+      if (state.parts.length === 0) {
+        list.innerHTML = '<div class="parts-list-empty">No parts defined. Add parts below or use the full pattern.</div>';
+        return;
+      }
+
+      list.innerHTML = state.parts.map((part, i) => `
+        <div class="part-item">
+          <span class="part-name">${escapeHtml(part.name)}</span>
+          <span class="part-rows">Rows ${part.startRow + 1}-${part.endRow + 1}</span>
+          <button onclick="removePart(${i})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Make removePart available globally for onclick handlers
+    window.removePart = removePart;
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // Check for modal
+      // Check for modals
       if (document.getElementById('modal-new').classList.contains('active')) {
         if (e.key === 'Escape') {
           document.getElementById('modal-new').classList.remove('active');
-        } else if (e.key === 'Enter') {
+        } else if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT') {
           document.getElementById('btn-new-confirm').click();
+        }
+        return;
+      }
+
+      if (document.getElementById('modal-parts').classList.contains('active')) {
+        if (e.key === 'Escape') {
+          document.getElementById('modal-parts').classList.remove('active');
         }
         return;
       }
@@ -856,14 +1161,34 @@
 
       // Mode-specific shortcuts
       if (state.mode === 'display') {
-        if (e.key === ' ' || e.code === 'Space' || e.key === 'ArrowDown') {
+        if (e.key === ' ' || e.code === 'Space') {
           e.preventDefault();
-          state.currentRow = (state.currentRow + 1) % state.height;
+          advanceInDisplayMode();
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          // Arrow down always advances row
+          const viewHeight = getViewHeight();
+          state.currentRow = (state.currentRow + 1) % viewHeight;
           render();
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
-          state.currentRow = (state.currentRow - 1 + state.height) % state.height;
+          const viewHeight = getViewHeight();
+          state.currentRow = (state.currentRow - 1 + viewHeight) % viewHeight;
           render();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          // Switch to previous part
+          if (state.parts.length > 0) {
+            state.currentPart = (state.currentPart - 1 + state.parts.length) % state.parts.length;
+            render();
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          // Switch to next part (without advancing row)
+          if (state.parts.length > 0) {
+            state.currentPart = (state.currentPart + 1) % state.parts.length;
+            render();
+          }
         } else if (e.key === 'Escape') {
           state.mode = 'edit';
           render();
@@ -871,9 +1196,11 @@
       } else {
         if (e.key === 'Enter') {
           state.mode = 'display';
+          state.currentPart = 0;
           render();
         }
       }
+
 
       // Number keys for quick color selection
       if (e.key >= '1' && e.key <= '9') {
