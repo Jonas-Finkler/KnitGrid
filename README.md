@@ -2,7 +2,7 @@
 
 Browser-based knitting pattern viewer and editor. Display patterns row by row while you knit, edit with simple drawing tools, save as PNG.
 
-**No build step. No dependencies. Works offline.**
+**[Try it online](https://jonas-finkler.github.io/KnitGrid/)** — No build step. No dependencies. Works offline.
 
 ## Features
 
