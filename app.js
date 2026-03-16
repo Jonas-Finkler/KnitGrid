@@ -493,11 +493,15 @@
     canvas.addEventListener('mouseup', () => isPainting = false);
     canvas.addEventListener('mouseleave', () => isPainting = false);
 
-    // Touch events
+    // Touch events - use passive: false to allow preventDefault
+    let touchStartTime = 0;
+
     canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      touchStartTime = Date.now();
+
       // Handle pinch-to-zoom (two fingers)
-      if (e.touches.length === 2) {
-        e.preventDefault();
+      if (e.touches.length >= 2) {
         isPinching = true;
         isPainting = false;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -508,24 +512,24 @@
 
       // Single touch in display mode - will handle tap-to-advance on touchend
       if (state.mode === 'display') {
-        e.preventDefault();
         return;
       }
 
       // Single touch in edit mode - paint
       if (state.mode === 'edit') {
-        e.preventDefault();
         isPainting = true;
         saveToHistory();
         const { x, y } = getCellFromEvent(e.touches[0]);
         paintCell(x, y);
       }
-    });
+    }, { passive: false });
 
     canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+
       // Handle pinch-to-zoom
-      if (e.touches.length === 2 && isPinching) {
-        e.preventDefault();
+      if (e.touches.length >= 2) {
+        isPinching = true;
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.hypot(dx, dy);
@@ -547,28 +551,32 @@
 
       // Single touch in edit mode - continue painting
       if (state.mode === 'edit' && isPainting && e.touches.length === 1) {
-        e.preventDefault();
         const { x, y } = getCellFromEvent(e.touches[0]);
         paintCell(x, y);
       }
-    });
+    }, { passive: false });
 
     canvas.addEventListener('touchend', e => {
-      // Reset pinch state
-      if (isPinching) {
-        isPinching = false;
-        lastPinchDistance = 0;
-        return;
-      }
+      e.preventDefault();
 
-      // Tap-to-advance in display mode (single tap with no remaining touches)
-      if (state.mode === 'display' && e.touches.length === 0 && e.changedTouches.length === 1) {
-        advanceInDisplayMode();
-        return;
+      // Reset pinch state when all fingers lifted
+      if (e.touches.length === 0) {
+        if (isPinching) {
+          isPinching = false;
+          lastPinchDistance = 0;
+          return;
+        }
+
+        // Tap-to-advance in display mode (quick tap, not a long press)
+        const tapDuration = Date.now() - touchStartTime;
+        if (state.mode === 'display' && tapDuration < 300) {
+          advanceInDisplayMode();
+          return;
+        }
       }
 
       isPainting = false;
-    });
+    }, { passive: false });
 
     // Toolbar buttons
     document.getElementById('btn-new').addEventListener('click', () => {

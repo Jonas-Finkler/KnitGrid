@@ -145,9 +145,7 @@ body {
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   flex-wrap: wrap;
-  position: sticky;
-  bottom: 28px;
-  z-index: 10;
+  flex-shrink: 0;
 }
 
 .color-swatch {
@@ -201,9 +199,7 @@ body {
   color: var(--status-text);
   font-size: 13px;
   flex-wrap: wrap;
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
+  flex-shrink: 0;
 }
 
 .status-bar kbd {
@@ -391,9 +387,7 @@ body {
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   justify-content: center;
-  position: sticky;
-  bottom: 28px;
-  z-index: 10;
+  flex-shrink: 0;
 }
 
 .mobile-nav-btn {
@@ -531,23 +525,20 @@ body {
     display: flex;
   }
 
-  /* Adjust bottom spacing when mobile nav is visible */
-  .palette-bar {
-    bottom: 0;
-  }
-
+  /* Hide palette bar in display mode on mobile */
   body.display-mode .palette-bar {
     display: none;
   }
-
-  body.display-mode .mobile-nav {
-    bottom: 28px;
-  }
 }
 
-/* Touch-friendly canvas in display mode */
+/* Touch-friendly canvas */
 @media (pointer: coarse) {
   #canvas {
     cursor: pointer;
   }
+}
+
+/* Prevent browser touch handling on canvas */
+#canvas {
+  touch-action: none;
 }
