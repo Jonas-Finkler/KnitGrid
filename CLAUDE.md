@@ -1,15 +1,15 @@
-# Knitting Pattern Tool - Development Notes
+# KnitGrid - Development Notes
 
 ## Project Overview
 
-A browser-based knitting pattern tool for displaying pixel-based patterns row by row while knitting. Designed for offline use with no build step required.
+A browser-based knitting pattern viewer and editor. Display patterns row by row while you knit, edit with simple drawing tools, save as PNG. Designed for offline use with no build step required.
 
 ## Technology Stack
 
 - **Vanilla HTML/CSS/JavaScript** - no frameworks or build step
 - **No dependencies** - works offline, just open in browser
 - **HTML Canvas** for grid rendering
-- **Nix Flake** for reproducible dev environment (`nix run .#serve` / `nix run .#open`)
+- **Nix Flake** for reproducible dev environment (`nix run` / `nix develop`)
 
 ## Key Design Decisions
 
@@ -139,14 +139,15 @@ When navigating rows in display mode, the view automatically scrolls to keep the
 ## File Structure
 
 ```
-knit-pattern-tool/
+knitgrid/
 ├── index.html      # HTML structure and markup
 ├── styles.css      # CSS styling and theming
-├── app.js          # JavaScript application logic (~500 lines)
-├── flake.nix       # Nix flake (dev shell, serve/open apps)
+├── app.js          # JavaScript application logic
+├── flake.nix       # Nix flake for packaging and dev
 ├── flake.lock      # Auto-generated lockfile
 ├── README.md       # User documentation
 ├── CLAUDE.md       # This file - dev notes
+├── LICENSE         # GPL-3.0
 └── .gitignore      # Ignores: result, .direnv
 ```
 

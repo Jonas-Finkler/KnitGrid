@@ -1,73 +1,75 @@
-# Knitting Pattern Tool
+# KnitGrid
 
-A browser-based knitting pattern tool that displays pixel-based knitting patterns row by row, supports editing with mouse, and can save/load PNG images.
+Browser-based knitting pattern viewer and editor. Display patterns row by row while you knit, edit with simple drawing tools, save as PNG.
 
-## Quick Start
+**No build step. No dependencies. Works offline.**
 
-### Using Nix (recommended)
+## Features
+
+- **Row-by-row display mode** - highlights current row, greys out the rest
+- **Multi-part patterns** - work on front/back panels with independent row tracking
+- **Simple editing** - click and drag to paint cells
+- **Standard PNG format** - patterns are images, edit them anywhere
+- **Undo/redo** - full history support
+- **Dark mode** - easy on the eyes
+- **Zoom controls** - auto-fit, manual zoom, or stretch to width
+
+## Install
+
+### Option 1: Just open it
+
+Download `index.html`, `styles.css`, and `app.js`. Open `index.html` in your browser.
+
+### Option 2: Nix
 
 ```bash
-# Enter development shell
+# Run directly
+nix run github:joonazan/knitgrid
+
+# Install to profile
+nix profile install github:joonazan/knitgrid
+knitgrid
+
+# Development
 nix develop
-
-# Start local server
-nix run .#serve
-
-# Open in browser (in another terminal)
-nix run .#open
+nix run .#serve-dev
 ```
 
-Then visit http://localhost:8080
-
-### Without Nix
-
-Simply open `index.html` in your browser, or serve it with any HTTP server:
+### Option 3: Any HTTP server
 
 ```bash
 python -m http.server 8080
 ```
 
-## Features
+## Usage
 
-### Edit Mode
-- Click or drag to paint cells with the selected color
-- Color palette with add/select functionality
-- Switch between parts with Left/Right arrow keys
-- Undo/Redo support (Ctrl+Z / Ctrl+Y)
-
-### Display Mode
-- Full pattern visible with current row highlighted
-- Other rows greyed out for easy reading
-- Navigate rows with Space key (cycles through parts, then advances)
-- Switch between parts with Left/Right arrow keys
-
-### Parts (Multi-Panel Patterns)
-- Work on multiple pattern sections (e.g., front/back of a sock)
-- Load separate PNG files as different parts
-- Each part maintains independent row position
-- Switch between parts in both edit and display mode
-- Parts advance together when cycling through with Space
-
-### File Operations
-- Save patterns as PNG images
-- Load PNG images as patterns
-- Create new projects with custom dimensions
-
-## Keyboard Shortcuts
+### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| Space | Next part, then next row (display mode) |
-| Arrow Up/Down | Change current row (display mode) |
-| Arrow Left/Right | Switch between parts (edit & display mode) |
-| Esc | Exit display mode |
-| Enter | Enter display mode |
-| Ctrl+Z | Undo |
-| Ctrl+Y / Ctrl+Shift+Z | Redo |
-| Ctrl+S | Save PNG |
-| Ctrl+O | Load PNG |
-| 1-9 | Quick select color 1-9 |
+| `Enter` | Enter display mode |
+| `Esc` | Exit to edit mode |
+| `Space` | Next part, then next row (display mode) |
+| `Up` `Down` | Change row |
+| `Left` `Right` | Switch parts |
+| `1`-`9` | Select color |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+S` | Save PNG |
+| `Ctrl+O` | Load PNG |
 
-## File Format
+### Multi-Part Patterns
 
-Patterns are saved as PNG images where each pixel represents one stitch. This allows easy sharing and editing with any image editor.
+Load multiple PNG files as separate parts (e.g., front and back of a sock). Each part tracks its own row position. In display mode:
+
+- `Left` `Right` switches between parts
+- `Space` cycles through all parts, then advances the row for all parts together
+- `Up` `Down` changes only the current part's row
+
+### File Format
+
+Patterns are PNG images where each pixel is one stitch. Edit them in any image editor.
+
+## License
+
+GPL-3.0

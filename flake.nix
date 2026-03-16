@@ -1,36 +1,52 @@
 {
-  description = "Knitting Pattern Tool";
+  description = "Browser-based knitting pattern viewer and editor";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs = { self, nixpkgs }:
     let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-
-      knit-pattern-tool = pkgs.stdenv.mkDerivation {
-        pname = "knit-pattern-tool";
-        version = "0.1.0";
-        src = ./.;
-
-        installPhase = ''
-          mkdir -p $out/share/knit-pattern-tool
-          cp index.html styles.css app.js $out/share/knit-pattern-tool/
-        '';
-      };
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f {
+        pkgs = nixpkgs.legacyPackages.${system};
+        inherit system;
+      });
     in {
-      packages.${system}.default = knit-pattern-tool;
+      packages = forAllSystems ({ pkgs, system }: {
+        default = pkgs.stdenv.mkDerivation {
+          pname = "knitgrid";
+          version = "1.0.0";
+          src = ./.;
 
-      devShells.${system}.default = pkgs.mkShell {
-        packages = [ pkgs.python3 ];
-      };
+          nativeBuildInputs = [ pkgs.makeWrapper ];
 
-      apps.${system} = {
-        serve = {
+          installPhase = ''
+            mkdir -p $out/share/knitgrid $out/bin
+
+            cp index.html styles.css app.js $out/share/knitgrid/
+
+            makeWrapper ${pkgs.python3}/bin/python $out/bin/knitgrid \
+              --add-flags "-m http.server 8080 -d $out/share/knitgrid"
+          '';
+
+          meta = {
+            description = "Browser-based knitting pattern viewer and editor";
+            homepage = "https://github.com/joonazan/knitgrid";
+            license = pkgs.lib.licenses.gpl3Only;
+            mainProgram = "knitgrid";
+          };
+        };
+      });
+
+      devShells = forAllSystems ({ pkgs, ... }: {
+        default = pkgs.mkShell {
+          packages = [ pkgs.python3 ];
+        };
+      });
+
+      apps = forAllSystems ({ pkgs, system }: {
+        default = {
           type = "app";
-          program = toString (pkgs.writeShellScript "serve" ''
-            ${pkgs.python3}/bin/python -m http.server 8080 -d ${knit-pattern-tool}/share/knit-pattern-tool
-          '');
+          program = "${self.packages.${system}.default}/bin/knitgrid";
         };
         serve-dev = {
           type = "app";
@@ -38,12 +54,6 @@
             ${pkgs.python3}/bin/python -m http.server 8080
           '');
         };
-        open = {
-          type = "app";
-          program = toString (pkgs.writeShellScript "open" ''
-            ${pkgs.xdg-utils}/bin/xdg-open http://localhost:8080
-          '');
-        };
-      };
+      });
     };
 }
