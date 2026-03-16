@@ -30,6 +30,7 @@ The JavaScript is organized into clearly labeled sections:
 - **UI UPDATES** - Status bar, palette, mode indicator
 - **PAINTING** - Cell painting logic
 - **FILE I/O** - PNG save/load
+- **IMAGE IMPORT** - Photo-to-grid conversion with crop and color quantization
 - **PARTS MANAGEMENT** - Multi-panel pattern handling
 - **EVENT HANDLERS** - All input event setup
 - **INITIALIZATION** - Startup code
@@ -59,6 +60,16 @@ Three zoom modes:
 - `auto`: Fits to container respecting min/max cell size
 - `manual`: User controls with +/- buttons (25% steps) or Ctrl+wheel (5% steps)
 - `fit`: Stretches pattern to full container width (respects max cell size)
+
+### Image Import (Photo to Grid)
+The Import button lets users upload any image (JPEG, PNG, etc.) and convert it to a knitting grid:
+- **Crop**: User can click-drag on the original image to select a region
+- **Resize**: User chooses target width in stitches (4–1000), height auto-calculated or manually set
+- **Color quantization**: Median cut algorithm reduces colors to 2–20 (user-selectable)
+- **Preview**: Side-by-side view of original (with crop overlay) and quantized result
+- **Lock aspect ratio**: Checkbox to keep width/height proportional to crop selection
+- Pipeline: `drawImage` handles crop+downscale in one step, then median cut quantizes, then pixels mapped to nearest palette color
+- Result replaces current grid/colors, clears parts and history
 
 ### Reading Direction
 - Default is bottom-to-top (how real knitters read patterns)
@@ -159,6 +170,7 @@ knitgrid/
 
 ## Potential Future Enhancements
 
+- Horizontal follow-along for very wide grids (>screen width) in display mode
 - Touch gestures for mobile zoom
 - Pattern mirroring/rotation
 - Row repeat indicators

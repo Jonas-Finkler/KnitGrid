@@ -53,6 +53,7 @@
   const statusRow = document.getElementById('status-row');
   const fileInput = document.getElementById('file-input');
   const partFileInput = document.getElementById('part-file-input');
+  const importFileInput = document.getElementById('import-file-input');
   const colorPicker = document.getElementById('color-picker');
 
   // ============================================================
@@ -70,6 +71,77 @@
       '#FF00FF': 'Magenta', '#00FFFF': 'Cyan'
     };
     return names[hex.toUpperCase()] || hex;
+  }
+
+  function medianCut(imageData, numColors) {
+    const pixels = [];
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      pixels.push([data[i], data[i + 1], data[i + 2]]);
+    }
+    if (pixels.length === 0) return [[0, 0, 0]];
+
+    let boxes = [pixels];
+
+    while (boxes.length < numColors) {
+      // Find the box with the widest channel range
+      let maxRange = -1;
+      let maxBoxIndex = 0;
+      let splitChannel = 0;
+
+      for (let i = 0; i < boxes.length; i++) {
+        const box = boxes[i];
+        if (box.length < 2) continue;
+        for (let ch = 0; ch < 3; ch++) {
+          let min = 255, max = 0;
+          for (const px of box) {
+            if (px[ch] < min) min = px[ch];
+            if (px[ch] > max) max = px[ch];
+          }
+          const range = max - min;
+          if (range > maxRange) {
+            maxRange = range;
+            maxBoxIndex = i;
+            splitChannel = ch;
+          }
+        }
+      }
+
+      if (maxRange <= 0) break;
+
+      const box = boxes[maxBoxIndex];
+      box.sort((a, b) => a[splitChannel] - b[splitChannel]);
+      const mid = Math.floor(box.length / 2);
+      boxes.splice(maxBoxIndex, 1, box.slice(0, mid), box.slice(mid));
+    }
+
+    return boxes.map(box => {
+      const avg = [0, 0, 0];
+      for (const px of box) {
+        avg[0] += px[0];
+        avg[1] += px[1];
+        avg[2] += px[2];
+      }
+      return [
+        Math.round(avg[0] / box.length),
+        Math.round(avg[1] / box.length),
+        Math.round(avg[2] / box.length)
+      ];
+    });
+  }
+
+  function nearestColorIndex(r, g, b, palette) {
+    let bestDist = Infinity;
+    let bestIndex = 0;
+    for (let i = 0; i < palette.length; i++) {
+      const [pr, pg, pb] = palette[i];
+      const dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
   }
 
   function escapeHtml(text) {
@@ -421,6 +493,176 @@
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+  }
+
+  // ============================================================
+  // IMAGE IMPORT
+  // ============================================================
+
+  let importImage = null;    // The loaded Image object
+  let importScale = 1;       // Scale factor from image coords to canvas display coords
+  let importOffsetX = 0;     // Offset to center image in canvas
+  let importOffsetY = 0;
+  let importCrop = null;     // {x, y, w, h} in image-space coordinates, null = full image
+  let importCropping = false;
+  let importCropStart = null;
+  let importPreviewTimer = null;
+
+  function drawImportOriginal() {
+    const canvas = document.getElementById('import-original-preview');
+    const ctx = canvas.getContext('2d');
+    const img = importImage;
+    if (!img) return;
+
+    // Size canvas to fit container while maintaining aspect ratio
+    const containerWidth = canvas.parentElement.clientWidth - 2; // border
+    const maxH = 250;
+    const imgAspect = img.width / img.height;
+    let displayW = containerWidth;
+    let displayH = displayW / imgAspect;
+    if (displayH > maxH) {
+      displayH = maxH;
+      displayW = displayH * imgAspect;
+    }
+
+    canvas.width = displayW;
+    canvas.height = displayH;
+    importScale = displayW / img.width;
+    importOffsetX = 0;
+    importOffsetY = 0;
+
+    ctx.drawImage(img, 0, 0, displayW, displayH);
+
+    // Draw crop overlay
+    const crop = importCrop || { x: 0, y: 0, w: img.width, h: img.height };
+    const cx = crop.x * importScale;
+    const cy = crop.y * importScale;
+    const cw = crop.w * importScale;
+    const ch = crop.h * importScale;
+
+    // Dim outside crop
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    // Top
+    ctx.fillRect(0, 0, displayW, cy);
+    // Bottom
+    ctx.fillRect(0, cy + ch, displayW, displayH - cy - ch);
+    // Left
+    ctx.fillRect(0, cy, cx, ch);
+    // Right
+    ctx.fillRect(cx + cw, cy, displayW - cx - cw, ch);
+
+    // Crop border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(cx, cy, cw, ch);
+    ctx.setLineDash([]);
+  }
+
+  function updateImportPreview() {
+    const img = importImage;
+    if (!img) return;
+
+    const targetW = Math.max(4, Math.min(1000, parseInt(document.getElementById('import-width').value) || 40));
+    const targetH = Math.max(4, Math.min(1000, parseInt(document.getElementById('import-height').value) || 40));
+    const numColors = parseInt(document.getElementById('import-colors').value) || 8;
+
+    document.getElementById('import-colors-display').textContent = numColors;
+
+    const crop = importCrop || { x: 0, y: 0, w: img.width, h: img.height };
+
+    // Downscale cropped region to target size
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = targetW;
+    tempCanvas.height = targetH;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, targetW, targetH);
+
+    const imageData = tempCtx.getImageData(0, 0, targetW, targetH);
+
+    // Quantize
+    const palette = medianCut(imageData, numColors);
+
+    // Map pixels to palette and build grid
+    const data = imageData.data;
+    const grid = [];
+    for (let y = 0; y < targetH; y++) {
+      grid[y] = [];
+      for (let x = 0; x < targetW; x++) {
+        const i = (y * targetW + x) * 4;
+        grid[y][x] = nearestColorIndex(data[i], data[i + 1], data[i + 2], palette);
+      }
+    }
+
+    const colors = palette.map(([r, g, b]) => rgbToHex(r, g, b));
+
+    // Store for apply
+    importResult = { grid, colors, width: targetW, height: targetH };
+
+    // Render result preview
+    const previewCanvas = document.getElementById('import-result-preview');
+    const containerWidth = previewCanvas.parentElement.clientWidth - 2;
+    const maxPH = 250;
+    const aspect = targetW / targetH;
+    let pw = containerWidth;
+    let ph = pw / aspect;
+    if (ph > maxPH) {
+      ph = maxPH;
+      pw = ph * aspect;
+    }
+    previewCanvas.width = pw;
+    previewCanvas.height = ph;
+    const pCtx = previewCanvas.getContext('2d');
+    const cellW = pw / targetW;
+    const cellH = ph / targetH;
+
+    for (let y = 0; y < targetH; y++) {
+      for (let x = 0; x < targetW; x++) {
+        pCtx.fillStyle = colors[grid[y][x]];
+        pCtx.fillRect(x * cellW, y * cellH, Math.ceil(cellW), Math.ceil(cellH));
+      }
+    }
+  }
+
+  let importResult = null;
+
+  function scheduleImportPreview() {
+    clearTimeout(importPreviewTimer);
+    importPreviewTimer = setTimeout(() => {
+      updateImportPreview();
+    }, 150);
+  }
+
+  function applyImport() {
+    if (!importResult) return;
+    state.width = importResult.width;
+    state.height = importResult.height;
+    state.grid = importResult.grid;
+    state.colors = importResult.colors;
+    state.selectedColor = 0;
+    state.currentRow = 0;
+    state.mode = 'edit';
+    state.history = [];
+    state.historyIndex = -1;
+    state.parts = [];
+    state.currentPart = 0;
+    saveToHistory();
+    render();
+    document.getElementById('modal-import').classList.remove('active');
+    importImage = null;
+    importResult = null;
+    importCrop = null;
+  }
+
+  function updateImportHeightFromAspect() {
+    if (!importImage) return;
+    const lockAspect = document.getElementById('import-lock-aspect').checked;
+    if (!lockAspect) return;
+    const crop = importCrop || { x: 0, y: 0, w: importImage.width, h: importImage.height };
+    const aspect = crop.w / crop.h;
+    const width = parseInt(document.getElementById('import-width').value) || 40;
+    const height = Math.max(4, Math.min(1000, Math.round(width / aspect)));
+    document.getElementById('import-height').value = height;
   }
 
   // ============================================================
@@ -776,6 +1018,167 @@
       partFileInput.value = '';
     });
 
+    // Import photo
+    document.getElementById('btn-import').addEventListener('click', () => importFileInput.click());
+
+    importFileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = event => {
+        const img = new Image();
+        img.onload = () => {
+          importImage = img;
+          importCrop = null;
+          importResult = null;
+
+          // Set initial width/height from aspect ratio
+          const aspect = img.width / img.height;
+          const initWidth = Math.min(60, img.width);
+          document.getElementById('import-width').value = initWidth;
+          document.getElementById('import-height').value = Math.max(4, Math.round(initWidth / aspect));
+          document.getElementById('import-lock-aspect').checked = true;
+          document.getElementById('import-colors').value = 8;
+          document.getElementById('import-colors-display').textContent = '8';
+
+          document.getElementById('modal-import').classList.add('active');
+
+          // Defer drawing to let modal render and get layout dimensions
+          requestAnimationFrame(() => {
+            drawImportOriginal();
+            updateImportPreview();
+          });
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+      importFileInput.value = '';
+    });
+
+    // Crop interaction on original preview canvas
+    const importOrigCanvas = document.getElementById('import-original-preview');
+
+    importOrigCanvas.addEventListener('mousedown', e => {
+      if (!importImage) return;
+      importCropping = true;
+      const rect = importOrigCanvas.getBoundingClientRect();
+      const scaleX = importOrigCanvas.width / rect.width;
+      const scaleY = importOrigCanvas.height / rect.height;
+      const canvasX = (e.clientX - rect.left) * scaleX;
+      const canvasY = (e.clientY - rect.top) * scaleY;
+      importCropStart = {
+        x: canvasX / importScale,
+        y: canvasY / importScale
+      };
+    });
+
+    importOrigCanvas.addEventListener('mousemove', e => {
+      if (!importCropping || !importImage) return;
+      const rect = importOrigCanvas.getBoundingClientRect();
+      const scaleX = importOrigCanvas.width / rect.width;
+      const scaleY = importOrigCanvas.height / rect.height;
+      const canvasX = (e.clientX - rect.left) * scaleX;
+      const canvasY = (e.clientY - rect.top) * scaleY;
+      const imgX = canvasX / importScale;
+      const imgY = canvasY / importScale;
+
+      const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
+      const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
+      const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
+      const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+
+      if (x2 - x1 > 2 && y2 - y1 > 2) {
+        importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+        drawImportOriginal();
+        updateImportHeightFromAspect();
+        scheduleImportPreview();
+      }
+    });
+
+    importOrigCanvas.addEventListener('mouseup', () => {
+      importCropping = false;
+    });
+
+    importOrigCanvas.addEventListener('mouseleave', () => {
+      importCropping = false;
+    });
+
+    // Touch support for crop
+    importOrigCanvas.addEventListener('touchstart', e => {
+      if (!importImage || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = importOrigCanvas.getBoundingClientRect();
+      const scaleX = importOrigCanvas.width / rect.width;
+      const scaleY = importOrigCanvas.height / rect.height;
+      const canvasX = (touch.clientX - rect.left) * scaleX;
+      const canvasY = (touch.clientY - rect.top) * scaleY;
+      importCropping = true;
+      importCropStart = {
+        x: canvasX / importScale,
+        y: canvasY / importScale
+      };
+    }, { passive: false });
+
+    importOrigCanvas.addEventListener('touchmove', e => {
+      if (!importCropping || !importImage || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = importOrigCanvas.getBoundingClientRect();
+      const scaleX = importOrigCanvas.width / rect.width;
+      const scaleY = importOrigCanvas.height / rect.height;
+      const canvasX = (touch.clientX - rect.left) * scaleX;
+      const canvasY = (touch.clientY - rect.top) * scaleY;
+      const imgX = canvasX / importScale;
+      const imgY = canvasY / importScale;
+
+      const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
+      const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
+      const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
+      const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+
+      if (x2 - x1 > 2 && y2 - y1 > 2) {
+        importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+        drawImportOriginal();
+        updateImportHeightFromAspect();
+        scheduleImportPreview();
+      }
+    }, { passive: false });
+
+    importOrigCanvas.addEventListener('touchend', () => {
+      importCropping = false;
+    });
+
+    // Import controls
+    document.getElementById('import-width').addEventListener('input', () => {
+      updateImportHeightFromAspect();
+      scheduleImportPreview();
+    });
+
+    document.getElementById('import-height').addEventListener('input', () => {
+      scheduleImportPreview();
+    });
+
+    document.getElementById('import-lock-aspect').addEventListener('change', () => {
+      updateImportHeightFromAspect();
+      scheduleImportPreview();
+    });
+
+    document.getElementById('import-colors').addEventListener('input', () => {
+      document.getElementById('import-colors-display').textContent =
+        document.getElementById('import-colors').value;
+      scheduleImportPreview();
+    });
+
+    document.getElementById('btn-import-apply').addEventListener('click', applyImport);
+
+    document.getElementById('btn-import-cancel').addEventListener('click', () => {
+      document.getElementById('modal-import').classList.remove('active');
+      importImage = null;
+      importResult = null;
+      importCrop = null;
+    });
+
     // Mobile navigation buttons
     document.getElementById('btn-prev-row').addEventListener('click', () => {
       if (state.mode !== 'display') return;
@@ -828,6 +1231,16 @@
       if (document.getElementById('modal-parts').classList.contains('active')) {
         if (e.key === 'Escape') {
           document.getElementById('modal-parts').classList.remove('active');
+        }
+        return;
+      }
+
+      if (document.getElementById('modal-import').classList.contains('active')) {
+        if (e.key === 'Escape') {
+          document.getElementById('modal-import').classList.remove('active');
+          importImage = null;
+          importResult = null;
+          importCrop = null;
         }
         return;
       }

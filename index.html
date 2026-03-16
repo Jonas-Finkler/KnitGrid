@@ -10,6 +10,7 @@
   <div class="toolbar">
     <button id="btn-new">New</button>
     <button id="btn-load">Load</button>
+    <button id="btn-import">Import</button>
     <button id="btn-save">Save</button>
     <button id="btn-display">Display</button>
     <button id="btn-parts">Parts</button>
@@ -97,9 +98,48 @@
     </div>
   </div>
 
+  <!-- Import Photo Modal -->
+  <div class="modal-overlay" id="modal-import">
+    <div class="modal import-modal">
+      <h2>Import Photo</h2>
+      <div class="import-previews">
+        <div class="import-preview-panel">
+          <label>Original (drag to crop)</label>
+          <canvas id="import-original-preview"></canvas>
+        </div>
+        <div class="import-preview-panel">
+          <label>Pattern Preview</label>
+          <canvas id="import-result-preview"></canvas>
+        </div>
+      </div>
+      <div class="import-controls">
+        <div class="form-group">
+          <label for="import-width">Width (stitches)</label>
+          <input type="number" id="import-width" value="40" min="4" max="1000">
+        </div>
+        <div class="form-group">
+          <label for="import-height">Height (stitches)</label>
+          <input type="number" id="import-height" value="40" min="4" max="1000">
+        </div>
+        <div class="form-group import-lock-group">
+          <label><input type="checkbox" id="import-lock-aspect" checked> Lock aspect ratio</label>
+        </div>
+        <div class="form-group">
+          <label for="import-colors">Colors: <span id="import-colors-display">8</span></label>
+          <input type="range" id="import-colors" min="2" max="20" value="8">
+        </div>
+      </div>
+      <div class="button-row">
+        <button id="btn-import-cancel">Cancel</button>
+        <button id="btn-import-apply" class="primary">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden inputs -->
   <input type="file" id="file-input" accept="image/png,image/*">
   <input type="file" id="part-file-input" accept="image/png,image/*">
+  <input type="file" id="import-file-input" accept="image/*">
   <input type="color" id="color-picker">
 
   <script src="app.js"></script>
