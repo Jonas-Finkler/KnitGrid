@@ -32,6 +32,12 @@
             ${pkgs.python3}/bin/python -m http.server 8080 -d ${knit-pattern-tool}/share/knit-pattern-tool
           '');
         };
+        serve-dev = {
+          type = "app";
+          program = toString (pkgs.writeShellScript "serve-dev" ''
+            ${pkgs.python3}/bin/python -m http.server 8080
+          '');
+        };
         open = {
           type = "app";
           program = toString (pkgs.writeShellScript "open" ''
