@@ -31,6 +31,7 @@
   const MIN_CELL_SIZE = 4;
   const MAX_CELL_SIZE = 60;
   const ZOOM_STEP = 0.25;
+  const WHEEL_ZOOM_STEP = 0.05;
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 4.0;
   const MAX_HISTORY = 50;
@@ -190,7 +191,7 @@
 
     // Calculate cell size based on zoom mode
     if (zoomMode === 'fit') {
-      cellSize = Math.max(MIN_CELL_SIZE, Math.floor(maxWidth / display.width));
+      cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, Math.floor(maxWidth / display.width)));
     } else if (zoomMode === 'manual') {
       cellSize = Math.max(MIN_CELL_SIZE, Math.min(MAX_CELL_SIZE, Math.round(20 * manualZoom)));
     } else {
@@ -233,9 +234,9 @@
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
 
-        ctx.strokeStyle = darkMode ? '#444' : '#ddd';
+        ctx.strokeStyle = 'rgba(128, 128, 128, 0.5)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        ctx.strokeRect(x * cellSize + 0.5, y * cellSize + 0.5, cellSize - 1, cellSize - 1);
       }
     }
 
@@ -552,17 +553,43 @@
     });
 
     // Zoom controls
-    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+    function captureCurrentZoom() {
+      if (zoomMode !== 'manual') {
+        manualZoom = cellSize / 20;
+      }
+    }
+
+    function setManualZoom() {
+      captureCurrentZoom();
       zoomMode = 'manual';
+      document.getElementById('btn-zoom-fit').classList.remove('active');
+    }
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      setManualZoom();
       manualZoom = Math.min(MAX_ZOOM, manualZoom + ZOOM_STEP);
       render();
     });
 
     document.getElementById('btn-zoom-out').addEventListener('click', () => {
-      zoomMode = 'manual';
+      setManualZoom();
       manualZoom = Math.max(MIN_ZOOM, manualZoom - ZOOM_STEP);
       render();
     });
+
+    // Ctrl+wheel zoom
+    document.querySelector('.canvas-container').addEventListener('wheel', (e) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        setManualZoom();
+        if (e.deltaY < 0) {
+          manualZoom = Math.min(MAX_ZOOM, manualZoom + WHEEL_ZOOM_STEP);
+        } else {
+          manualZoom = Math.max(MIN_ZOOM, manualZoom - WHEEL_ZOOM_STEP);
+        }
+        render();
+      }
+    }, { passive: false });
 
     document.getElementById('btn-zoom-fit').addEventListener('click', () => {
       zoomMode = zoomMode === 'fit' ? 'auto' : 'fit';
