@@ -30,7 +30,7 @@
 
           meta = {
             description = "Browser-based knitting pattern viewer and editor";
-            homepage = "https://github.com/joonazan/knitgrid";
+            homepage = "https://github.com/Jonas-Finkler/KnitGrid";
             license = pkgs.lib.licenses.gpl3Only;
             mainProgram = "knitgrid";
           };

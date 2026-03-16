@@ -24,10 +24,10 @@ Download `index.html`, `styles.css`, and `app.js`. Open `index.html` in your bro
 
 ```bash
 # Run directly
-nix run github:joonazan/knitgrid
+nix run github:Jonas-Finkler/KnitGrid
 
 # Install to profile
-nix profile install github:joonazan/knitgrid
+nix profile install github:Jonas-Finkler/KnitGrid
 knitgrid
 
 # Development
