@@ -43,6 +43,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - accounts for mobile browser chrome */
   overflow: hidden;
   display: flex;
   flex-direction: column;
