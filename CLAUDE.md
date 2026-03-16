@@ -57,13 +57,18 @@ Parts allow working on multiple pattern sections (e.g., front/back of a sock) fr
 ### Zoom System
 Three zoom modes:
 - `auto`: Fits to container respecting min/max cell size
-- `manual`: User controls with +/- buttons (25% steps)
-- `fit`: Stretches pattern to full container width (useful for wide patterns)
+- `manual`: User controls with +/- buttons (25% steps) or Ctrl+wheel (5% steps)
+- `fit`: Stretches pattern to full container width (respects max cell size)
+
+### Reading Direction
+- Default is bottom-to-top (how real knitters read patterns)
+- Row 1 is at the bottom, navigation moves highlight upward
+- Toggle with "Bottom-Up" / "Top-Down" button in toolbar
+- Persists preference to localStorage
 
 ### Dark Mode
 - Uses CSS custom properties (variables) for theming
 - Persists preference to localStorage
-- Grid lines color changes with theme (`#ddd` light / `#444` dark)
 
 ## State Structure
 
@@ -96,6 +101,7 @@ state = {
 | Ctrl+Y / Ctrl+Shift+Z | Any | Redo |
 | Ctrl+S | Any | Save PNG |
 | Ctrl+O | Any | Load PNG |
+| Ctrl+Wheel | Any | Zoom in/out (smooth) |
 
 ## File Format
 

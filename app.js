@@ -27,6 +27,7 @@
   let zoomMode = 'auto';
   let manualZoom = 1.0;
   let darkMode = localStorage.getItem('darkMode') === 'true';
+  let readBottomToTop = localStorage.getItem('readBottomToTop') !== 'false'; // default true
 
   const MIN_CELL_SIZE = 4;
   const MAX_CELL_SIZE = 60;
@@ -183,7 +184,7 @@
     container.scrollTop = Math.max(0, Math.min(maxScroll, targetScroll));
   }
 
-  function render() {
+  function render(autoScroll = true) {
     const display = getDisplayGrid();
     const container = document.querySelector('.canvas-container');
     const maxWidth = container.clientWidth - 40;
@@ -206,19 +207,22 @@
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Determine current row
+    // Determine current row (logical row in knitting order)
     const part = getCurrentPart();
-    let displayRow = state.currentRow;
+    let logicalRow = state.currentRow;
     if (part && state.mode === 'display') {
-      displayRow = Math.min(part.currentRow, part.height - 1);
-      part.currentRow = displayRow;
+      logicalRow = Math.min(part.currentRow, part.height - 1);
+      part.currentRow = logicalRow;
     } else {
       const viewHeight = getViewHeight();
       if (state.currentRow >= viewHeight) {
         state.currentRow = viewHeight - 1;
       }
-      displayRow = state.currentRow;
+      logicalRow = state.currentRow;
     }
+
+    // Convert to visual row (bottom-to-top if enabled)
+    const visualRow = readBottomToTop ? display.height - 1 - logicalRow : logicalRow;
 
     // Draw cells
     for (let y = 0; y < display.height; y++) {
@@ -229,7 +233,7 @@
         ctx.fillStyle = color;
         ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
 
-        if (state.mode === 'display' && y !== displayRow) {
+        if (state.mode === 'display' && y !== visualRow) {
           ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
           ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
@@ -244,8 +248,10 @@
     if (state.mode === 'display') {
       ctx.strokeStyle = '#ff0000';
       ctx.lineWidth = 3;
-      ctx.strokeRect(1, displayRow * cellSize + 1, display.width * cellSize - 2, cellSize - 2);
-      scrollToCurrentRow(displayRow);
+      ctx.strokeRect(1, visualRow * cellSize + 1, display.width * cellSize - 2, cellSize - 2);
+      if (autoScroll) {
+        scrollToCurrentRow(visualRow);
+      }
     }
 
     updateUI();
@@ -597,6 +603,29 @@
       document.getElementById('btn-zoom-fit').classList.toggle('active', zoomMode === 'fit');
     });
 
+    // Reading direction
+    const btnReadDirection = document.getElementById('btn-read-direction');
+    btnReadDirection.classList.toggle('active', readBottomToTop);
+    btnReadDirection.textContent = readBottomToTop ? 'Bottom-Up' : 'Top-Down';
+    btnReadDirection.addEventListener('click', () => {
+      // Keep visual position the same, except first row moves to new start
+      const part = getCurrentPart();
+      if (part) {
+        if (part.currentRow !== 0) {
+          part.currentRow = part.height - 1 - part.currentRow;
+        }
+      } else {
+        if (state.currentRow !== 0) {
+          state.currentRow = state.height - 1 - state.currentRow;
+        }
+      }
+      readBottomToTop = !readBottomToTop;
+      localStorage.setItem('readBottomToTop', readBottomToTop);
+      btnReadDirection.classList.toggle('active', readBottomToTop);
+      btnReadDirection.textContent = readBottomToTop ? 'Bottom-Up' : 'Top-Down';
+      render(false);
+    });
+
     // Dark mode
     document.getElementById('btn-dark-mode').addEventListener('click', () => {
       darkMode = !darkMode;
@@ -704,22 +733,17 @@
         if (e.key === ' ' || e.code === 'Space') {
           e.preventDefault();
           advanceInDisplayMode();
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault();
           const part = getCurrentPart();
+          const height = part ? part.height : state.height;
+          // In bottom-to-top mode, visual down = previous row, visual up = next row
+          const goingUp = readBottomToTop ? (e.key === 'ArrowDown') : (e.key === 'ArrowUp');
+          const delta = goingUp ? -1 : 1;
           if (part) {
-            part.currentRow = (part.currentRow + 1) % part.height;
+            part.currentRow = (part.currentRow + delta + height) % height;
           } else {
-            state.currentRow = (state.currentRow + 1) % state.height;
-          }
-          render();
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          const part = getCurrentPart();
-          if (part) {
-            part.currentRow = (part.currentRow - 1 + part.height) % part.height;
-          } else {
-            state.currentRow = (state.currentRow - 1 + state.height) % state.height;
+            state.currentRow = (state.currentRow + delta + height) % height;
           }
           render();
         } else if (e.key === 'ArrowLeft' && state.parts.length > 0) {
