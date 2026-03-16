@@ -168,18 +168,18 @@
 
   function scrollToCurrentRow(displayRow) {
     const container = document.querySelector('.canvas-container');
-    const rowTop = displayRow * cellSize;
-    const rowCenter = rowTop + cellSize / 2;
     const containerHeight = container.clientHeight;
+    const padding = 20;
 
-    // Calculate scroll position to center the row
+    // Row center position within scrollable area
+    const rowCenter = padding + displayRow * cellSize + cellSize / 2;
+
+    // Scroll to center the row
     const targetScroll = rowCenter - containerHeight / 2;
 
     // Clamp to valid scroll range
-    const maxScroll = canvas.height - containerHeight;
-    const scrollTop = Math.max(0, Math.min(maxScroll, targetScroll));
-
-    container.scrollTop = scrollTop;
+    const maxScroll = container.scrollHeight - containerHeight;
+    container.scrollTop = Math.max(0, Math.min(maxScroll, targetScroll));
   }
 
   function render() {
@@ -489,6 +489,7 @@
     // Toolbar buttons
     document.getElementById('btn-new').addEventListener('click', () => {
       document.getElementById('modal-new').classList.add('active');
+      document.getElementById('new-width').focus();
     });
 
     document.getElementById('btn-new-cancel').addEventListener('click', () => {
@@ -580,6 +581,7 @@
     document.getElementById('btn-parts').addEventListener('click', () => {
       renderPartsList();
       document.getElementById('modal-parts').classList.add('active');
+      document.getElementById('part-name').focus();
     });
 
     document.getElementById('btn-parts-close').addEventListener('click', () => {

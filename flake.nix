@@ -7,7 +7,20 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+
+      knit-pattern-tool = pkgs.stdenv.mkDerivation {
+        pname = "knit-pattern-tool";
+        version = "0.1.0";
+        src = ./.;
+
+        installPhase = ''
+          mkdir -p $out/share/knit-pattern-tool
+          cp index.html styles.css app.js $out/share/knit-pattern-tool/
+        '';
+      };
     in {
+      packages.${system}.default = knit-pattern-tool;
+
       devShells.${system}.default = pkgs.mkShell {
         packages = [ pkgs.python3 ];
       };
@@ -16,8 +29,7 @@
         serve = {
           type = "app";
           program = toString (pkgs.writeShellScript "serve" ''
-            cd ${./.}
-            ${pkgs.python3}/bin/python -m http.server 8080
+            ${pkgs.python3}/bin/python -m http.server 8080 -d ${knit-pattern-tool}/share/knit-pattern-tool
           '');
         };
         open = {
