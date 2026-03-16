@@ -29,6 +29,10 @@
   let darkMode = localStorage.getItem('darkMode') === 'true';
   let readBottomToTop = localStorage.getItem('readBottomToTop') !== 'false'; // default true
 
+  // Touch/pinch state
+  let lastPinchDistance = 0;
+  let isPinching = false;
+
   const MIN_CELL_SIZE = 4;
   const MAX_CELL_SIZE = 60;
   const ZOOM_STEP = 0.25;
@@ -261,10 +265,25 @@
   // UI UPDATES
   // ============================================================
 
+  function updateMobileNav() {
+    const mobileNav = document.getElementById('mobile-nav');
+    const hasParts = state.parts.length > 0;
+
+    // Show mobile nav in display mode
+    mobileNav.classList.toggle('visible', state.mode === 'display');
+    mobileNav.classList.toggle('no-parts', !hasParts);
+
+    // Toggle body class for CSS adjustments
+    document.body.classList.toggle('display-mode', state.mode === 'display');
+  }
+
   function updateUI() {
     // Mode indicator
     modeIndicator.textContent = `Mode: ${state.mode === 'edit' ? 'Edit' : 'Display'}`;
     modeIndicator.classList.toggle('display-mode', state.mode === 'display');
+
+    // Update mobile navigation
+    updateMobileNav();
 
     // Status row
     const part = getCurrentPart();
@@ -476,22 +495,80 @@
 
     // Touch events
     canvas.addEventListener('touchstart', e => {
-      if (state.mode !== 'edit') return;
-      e.preventDefault();
-      isPainting = true;
-      saveToHistory();
-      const { x, y } = getCellFromEvent(e.touches[0]);
-      paintCell(x, y);
+      // Handle pinch-to-zoom (two fingers)
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        isPinching = true;
+        isPainting = false;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDistance = Math.hypot(dx, dy);
+        return;
+      }
+
+      // Single touch in display mode - will handle tap-to-advance on touchend
+      if (state.mode === 'display') {
+        e.preventDefault();
+        return;
+      }
+
+      // Single touch in edit mode - paint
+      if (state.mode === 'edit') {
+        e.preventDefault();
+        isPainting = true;
+        saveToHistory();
+        const { x, y } = getCellFromEvent(e.touches[0]);
+        paintCell(x, y);
+      }
     });
 
     canvas.addEventListener('touchmove', e => {
-      if (state.mode !== 'edit' || !isPainting) return;
-      e.preventDefault();
-      const { x, y } = getCellFromEvent(e.touches[0]);
-      paintCell(x, y);
+      // Handle pinch-to-zoom
+      if (e.touches.length === 2 && isPinching) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const distance = Math.hypot(dx, dy);
+
+        if (lastPinchDistance > 0) {
+          const scale = distance / lastPinchDistance;
+          // Capture current zoom before switching to manual mode
+          if (zoomMode !== 'manual') {
+            manualZoom = cellSize / 20;
+            zoomMode = 'manual';
+            document.getElementById('btn-zoom-fit').classList.remove('active');
+          }
+          manualZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, manualZoom * scale));
+          render(false);
+        }
+        lastPinchDistance = distance;
+        return;
+      }
+
+      // Single touch in edit mode - continue painting
+      if (state.mode === 'edit' && isPainting && e.touches.length === 1) {
+        e.preventDefault();
+        const { x, y } = getCellFromEvent(e.touches[0]);
+        paintCell(x, y);
+      }
     });
 
-    canvas.addEventListener('touchend', () => isPainting = false);
+    canvas.addEventListener('touchend', e => {
+      // Reset pinch state
+      if (isPinching) {
+        isPinching = false;
+        lastPinchDistance = 0;
+        return;
+      }
+
+      // Tap-to-advance in display mode (single tap with no remaining touches)
+      if (state.mode === 'display' && e.touches.length === 0 && e.changedTouches.length === 1) {
+        advanceInDisplayMode();
+        return;
+      }
+
+      isPainting = false;
+    });
 
     // Toolbar buttons
     document.getElementById('btn-new').addEventListener('click', () => {
@@ -689,6 +766,43 @@
         });
       }
       partFileInput.value = '';
+    });
+
+    // Mobile navigation buttons
+    document.getElementById('btn-prev-row').addEventListener('click', () => {
+      if (state.mode !== 'display') return;
+      const part = getCurrentPart();
+      const height = part ? part.height : state.height;
+      if (part) {
+        part.currentRow = (part.currentRow - 1 + height) % height;
+      } else {
+        state.currentRow = (state.currentRow - 1 + height) % height;
+      }
+      render();
+    });
+
+    document.getElementById('btn-next-row').addEventListener('click', () => {
+      if (state.mode !== 'display') return;
+      const part = getCurrentPart();
+      const height = part ? part.height : state.height;
+      if (part) {
+        part.currentRow = (part.currentRow + 1) % height;
+      } else {
+        state.currentRow = (state.currentRow + 1) % height;
+      }
+      render();
+    });
+
+    document.getElementById('btn-prev-part').addEventListener('click', () => {
+      if (state.mode !== 'display' || state.parts.length === 0) return;
+      state.currentPart = (state.currentPart - 1 + state.parts.length) % state.parts.length;
+      render();
+    });
+
+    document.getElementById('btn-next-part').addEventListener('click', () => {
+      if (state.mode !== 'display' || state.parts.length === 0) return;
+      state.currentPart = (state.currentPart + 1) % state.parts.length;
+      render();
     });
 
     // Keyboard shortcuts

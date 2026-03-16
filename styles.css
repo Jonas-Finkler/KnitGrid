@@ -382,3 +382,172 @@ body {
   font-size: 13px;
   margin-right: 8px;
 }
+
+/* Mobile navigation controls */
+.mobile-nav {
+  display: none;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  justify-content: center;
+  position: sticky;
+  bottom: 28px;
+  z-index: 10;
+}
+
+.mobile-nav-btn {
+  padding: 12px 16px;
+  min-width: 70px;
+  min-height: 44px;
+  border: 1px solid var(--border-color-dark);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  touch-action: manipulation;
+}
+
+.mobile-nav-btn:active {
+  background: var(--bg-tertiary);
+}
+
+/* Hide part buttons when no parts exist */
+.mobile-nav.no-parts #btn-prev-part,
+.mobile-nav.no-parts #btn-next-part {
+  display: none;
+}
+
+/* Mobile styles */
+@media (max-width: 600px) {
+  /* Toolbar adjustments */
+  .toolbar {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .toolbar button {
+    padding: 8px 10px;
+    font-size: 13px;
+    min-height: 44px;
+  }
+
+  .toolbar .separator {
+    display: none;
+  }
+
+  .toolbar .spacer {
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .toolbar .mode-indicator {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  /* Zoom controls */
+  .zoom-controls button {
+    padding: 8px 10px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .zoom-controls .zoom-label {
+    min-width: 40px;
+    font-size: 12px;
+  }
+
+  /* Canvas container */
+  .canvas-container {
+    padding: 12px;
+  }
+
+  /* Palette bar */
+  .palette-bar {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .color-swatch {
+    width: 36px;
+    height: 36px;
+  }
+
+  .add-color-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .palette-bar .selected-info {
+    display: none;
+  }
+
+  /* Status bar - hide keyboard hints on mobile */
+  .status-bar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .status-bar .keyboard-hint {
+    display: none;
+  }
+
+  /* Modal adjustments */
+  .modal {
+    margin: 16px;
+    min-width: auto;
+    width: calc(100vw - 32px);
+    max-width: 400px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+
+  .modal.wide {
+    min-width: auto;
+    max-width: calc(100vw - 32px);
+  }
+
+  .modal button {
+    min-height: 44px;
+  }
+
+  .part-add-form {
+    flex-wrap: wrap;
+  }
+
+  .part-add-form .form-group {
+    flex-basis: 100%;
+  }
+
+  .part-add-form button {
+    flex: 1;
+  }
+
+  /* Show mobile nav in display mode */
+  .mobile-nav.visible {
+    display: flex;
+  }
+
+  /* Adjust bottom spacing when mobile nav is visible */
+  .palette-bar {
+    bottom: 0;
+  }
+
+  body.display-mode .palette-bar {
+    display: none;
+  }
+
+  body.display-mode .mobile-nav {
+    bottom: 28px;
+  }
+}
+
+/* Touch-friendly canvas in display mode */
+@media (pointer: coarse) {
+  #canvas {
+    cursor: pointer;
+  }
+}

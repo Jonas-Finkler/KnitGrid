@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>KnitGrid</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -38,11 +38,19 @@
 
   <div class="status-bar">
     <span id="status-row">Row 1 of 20</span>
-    <span><kbd>Ctrl+Z</kbd> Undo</span>
-    <span><kbd>Ctrl+Y</kbd> Redo</span>
-    <span><kbd>Space</kbd> Next</span>
-    <span><kbd>Arrows</kbd> Navigate</span>
-    <span><kbd>Esc</kbd> Edit</span>
+    <span class="keyboard-hint"><kbd>Ctrl+Z</kbd> Undo</span>
+    <span class="keyboard-hint"><kbd>Ctrl+Y</kbd> Redo</span>
+    <span class="keyboard-hint"><kbd>Space</kbd> Next</span>
+    <span class="keyboard-hint"><kbd>Arrows</kbd> Navigate</span>
+    <span class="keyboard-hint"><kbd>Esc</kbd> Edit</span>
+  </div>
+
+  <!-- Mobile navigation controls (shown in display mode on touch devices) -->
+  <div class="mobile-nav" id="mobile-nav">
+    <button id="btn-prev-part" class="mobile-nav-btn" title="Previous part">&lt; Part</button>
+    <button id="btn-prev-row" class="mobile-nav-btn" title="Previous row">Row -</button>
+    <button id="btn-next-row" class="mobile-nav-btn" title="Next row">Row +</button>
+    <button id="btn-next-part" class="mobile-nav-btn" title="Next part">Part &gt;</button>
   </div>
 
   <!-- New Project Modal -->
