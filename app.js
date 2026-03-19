@@ -526,8 +526,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
     if (!img) return;
 
     // Size canvas to fit container while maintaining aspect ratio
-    const containerWidth = canvas.parentElement.clientWidth - 2; // border
-    const maxH = 400;
+    const container = canvas.parentElement;
+    const containerWidth = container.clientWidth - 2; // border
+    // Use smaller of 400px or 35% of viewport height for mobile compatibility
+    const maxH = Math.min(400, window.innerHeight * 0.35);
     const imgAspect = img.width / img.height;
     let displayW = containerWidth;
     let displayH = displayW / imgAspect;
@@ -570,7 +572,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
     ctx.setLineDash([]);
 
     // Draw resize handles at corners and edges
-    const handleSize = 10;
+    const handleSize = 16;
     ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#007bff';
     ctx.lineWidth = 1;
@@ -609,7 +611,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
     const cw = crop.w * importScale;
     const ch = crop.h * importScale;
 
-    const threshold = 12; // pixels from edge to detect
+    const threshold = 20; // pixels from edge to detect (larger for touch)
 
     const nearLeft = Math.abs(canvasX - cx) < threshold;
     const nearRight = Math.abs(canvasX - (cx + cw)) < threshold;

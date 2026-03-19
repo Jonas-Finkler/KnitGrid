@@ -552,9 +552,7 @@ body {
   }
 
   .import-preview-panel canvas {
-    min-height: 80px;
-    max-height: none;
-    flex: 1;
+    max-height: 35vh;
   }
 
   .import-controls {
@@ -614,6 +612,7 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 .import-preview-panel label {
@@ -626,15 +625,12 @@ body {
 }
 
 .import-preview-panel canvas {
-  width: 100%;
-  flex: 1;
-  min-height: 250px;
+  max-width: 100%;
   max-height: 60vh;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--bg-primary);
   cursor: crosshair;
-  object-fit: contain;
 }
 
 .import-controls {
