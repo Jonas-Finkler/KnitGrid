@@ -1,6 +1,11 @@
 // Knitting Pattern Tool - Application
 // Organized into logical sections for maintainability
 
+import * as pdfjsLib from './pdf.min.mjs';
+
+// Set worker source for PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
+
 (function() {
   'use strict';
 
@@ -507,6 +512,12 @@
   let importCropping = false;
   let importCropStart = null;
   let importPreviewTimer = null;
+  let importResizeEdge = null; // 'n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se', or null
+
+  // PDF import state
+  let importPdf = null;         // PDFDocumentProxy from pdf.js
+  let importPdfPageCount = 0;   // Total pages
+  let importPdfCurrentPage = 1; // Currently displayed page (1-indexed)
 
   function drawImportOriginal() {
     const canvas = document.getElementById('import-original-preview');
@@ -516,7 +527,7 @@
 
     // Size canvas to fit container while maintaining aspect ratio
     const containerWidth = canvas.parentElement.clientWidth - 2; // border
-    const maxH = 250;
+    const maxH = 400;
     const imgAspect = img.width / img.height;
     let displayW = containerWidth;
     let displayH = displayW / imgAspect;
@@ -557,6 +568,84 @@
     ctx.setLineDash([6, 4]);
     ctx.strokeRect(cx, cy, cw, ch);
     ctx.setLineDash([]);
+
+    // Draw resize handles at corners and edges
+    const handleSize = 10;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#007bff';
+    ctx.lineWidth = 1;
+
+    // Corner handles
+    const corners = [
+      { x: cx, y: cy },                    // nw
+      { x: cx + cw, y: cy },               // ne
+      { x: cx, y: cy + ch },               // sw
+      { x: cx + cw, y: cy + ch }           // se
+    ];
+    corners.forEach(c => {
+      ctx.fillRect(c.x - handleSize/2, c.y - handleSize/2, handleSize, handleSize);
+      ctx.strokeRect(c.x - handleSize/2, c.y - handleSize/2, handleSize, handleSize);
+    });
+
+    // Edge handles (middle of each edge)
+    const edges = [
+      { x: cx + cw/2, y: cy },             // n
+      { x: cx + cw/2, y: cy + ch },        // s
+      { x: cx, y: cy + ch/2 },             // w
+      { x: cx + cw, y: cy + ch/2 }         // e
+    ];
+    edges.forEach(e => {
+      ctx.fillRect(e.x - handleSize/2, e.y - handleSize/2, handleSize, handleSize);
+      ctx.strokeRect(e.x - handleSize/2, e.y - handleSize/2, handleSize, handleSize);
+    });
+  }
+
+  function getResizeEdge(canvasX, canvasY) {
+    if (!importImage || !importCrop) return null;
+
+    const crop = importCrop;
+    const cx = crop.x * importScale;
+    const cy = crop.y * importScale;
+    const cw = crop.w * importScale;
+    const ch = crop.h * importScale;
+
+    const threshold = 12; // pixels from edge to detect
+
+    const nearLeft = Math.abs(canvasX - cx) < threshold;
+    const nearRight = Math.abs(canvasX - (cx + cw)) < threshold;
+    const nearTop = Math.abs(canvasY - cy) < threshold;
+    const nearBottom = Math.abs(canvasY - (cy + ch)) < threshold;
+
+    const inHorizontalRange = canvasX >= cx - threshold && canvasX <= cx + cw + threshold;
+    const inVerticalRange = canvasY >= cy - threshold && canvasY <= cy + ch + threshold;
+
+    // Check corners first
+    if (nearTop && nearLeft) return 'nw';
+    if (nearTop && nearRight) return 'ne';
+    if (nearBottom && nearLeft) return 'sw';
+    if (nearBottom && nearRight) return 'se';
+
+    // Check edges
+    if (nearTop && inHorizontalRange) return 'n';
+    if (nearBottom && inHorizontalRange) return 's';
+    if (nearLeft && inVerticalRange) return 'w';
+    if (nearRight && inVerticalRange) return 'e';
+
+    return null;
+  }
+
+  function getResizeCursor(edge) {
+    const cursors = {
+      'n': 'ns-resize',
+      's': 'ns-resize',
+      'e': 'ew-resize',
+      'w': 'ew-resize',
+      'nw': 'nwse-resize',
+      'se': 'nwse-resize',
+      'ne': 'nesw-resize',
+      'sw': 'nesw-resize'
+    };
+    return cursors[edge] || 'crosshair';
   }
 
   function updateImportPreview() {
@@ -600,7 +689,7 @@
     // Render result preview
     const previewCanvas = document.getElementById('import-result-preview');
     const containerWidth = previewCanvas.parentElement.clientWidth - 2;
-    const maxPH = 250;
+    const maxPH = 400;
     const aspect = targetW / targetH;
     let pw = containerWidth;
     let ph = pw / aspect;
@@ -661,6 +750,81 @@
     const width = parseInt(document.getElementById('import-width').value) || 40;
     const height = Math.max(4, Math.min(1000, Math.round(width / aspect)));
     document.getElementById('import-height').value = height;
+  }
+
+  // ============================================================
+  // PDF IMPORT
+  // ============================================================
+
+  function isPdfFile(file) {
+    return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  }
+
+  async function loadPdfFile(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    importPdf = pdf;
+    importPdfPageCount = pdf.numPages;
+    importPdfCurrentPage = 1;
+    await renderPdfPage(1);
+    showPageNav();
+  }
+
+  async function renderPdfPage(pageNum) {
+    const page = await importPdf.getPage(pageNum);
+    const scale = 2; // Render at 2x for quality
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Convert canvas to Image for existing pipeline
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    await new Promise(resolve => img.onload = resolve);
+
+    importImage = img;
+    importCrop = null;
+
+    // Set initial width/height from aspect ratio
+    const aspect = img.width / img.height;
+    const initWidth = Math.min(60, img.width);
+    document.getElementById('import-width').value = initWidth;
+    document.getElementById('import-height').value = Math.max(4, Math.round(initWidth / aspect));
+
+    drawImportOriginal();
+    updateImportPreview();
+  }
+
+  function showPageNav() {
+    const pageNav = document.getElementById('import-page-nav');
+    if (importPdfPageCount > 1) {
+      pageNav.style.display = 'flex';
+    } else {
+      pageNav.style.display = 'none';
+    }
+    updatePageIndicator();
+  }
+
+  function hidePageNav() {
+    document.getElementById('import-page-nav').style.display = 'none';
+  }
+
+  function updatePageIndicator() {
+    document.getElementById('page-indicator').textContent = `Page ${importPdfCurrentPage} of ${importPdfPageCount}`;
+    document.getElementById('btn-page-prev').disabled = importPdfCurrentPage <= 1;
+    document.getElementById('btn-page-next').disabled = importPdfCurrentPage >= importPdfPageCount;
+  }
+
+  function resetPdfState() {
+    importPdf = null;
+    importPdfPageCount = 0;
+    importPdfCurrentPage = 1;
+    hidePageNav();
   }
 
   // ============================================================
@@ -1019,37 +1183,57 @@
     // Import photo
     document.getElementById('btn-import').addEventListener('click', () => importFileInput.click());
 
-    importFileInput.addEventListener('change', e => {
+    importFileInput.addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = event => {
-        const img = new Image();
-        img.onload = () => {
-          importImage = img;
-          importCrop = null;
-          importResult = null;
-
-          // Set initial width/height from aspect ratio
-          const aspect = img.width / img.height;
-          const initWidth = Math.min(60, img.width);
-          document.getElementById('import-width').value = initWidth;
-          document.getElementById('import-height').value = Math.max(4, Math.round(initWidth / aspect));
-          document.getElementById('import-lock-aspect').checked = true;
-          document.getElementById('import-colors').value = 8;
-
-          document.getElementById('modal-import').classList.add('active');
-
-          // Defer drawing to let modal render and get layout dimensions
-          requestAnimationFrame(() => {
-            drawImportOriginal();
-            updateImportPreview();
-          });
-        };
-        img.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
       importFileInput.value = '';
+
+      // Reset state
+      importCrop = null;
+      importResult = null;
+      resetPdfState();
+
+      // Set default values
+      document.getElementById('import-lock-aspect').checked = true;
+      document.getElementById('import-colors').value = 8;
+
+      // Show modal
+      document.getElementById('modal-import').classList.add('active');
+
+      if (isPdfFile(file)) {
+        // PDF file - use pdf.js to render
+        try {
+          await loadPdfFile(file);
+        } catch (err) {
+          console.error('Failed to load PDF:', err);
+          document.getElementById('modal-import').classList.remove('active');
+          alert('Failed to load PDF file.');
+          return;
+        }
+      } else {
+        // Image file - existing flow
+        const reader = new FileReader();
+        reader.onload = event => {
+          const img = new Image();
+          img.onload = () => {
+            importImage = img;
+
+            // Set initial width/height from aspect ratio
+            const aspect = img.width / img.height;
+            const initWidth = Math.min(60, img.width);
+            document.getElementById('import-width').value = initWidth;
+            document.getElementById('import-height').value = Math.max(4, Math.round(initWidth / aspect));
+
+            // Defer drawing to let modal render and get layout dimensions
+            requestAnimationFrame(() => {
+              drawImportOriginal();
+              updateImportPreview();
+            });
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
     });
 
     // Crop interaction on original preview canvas
@@ -1057,20 +1241,30 @@
 
     importOrigCanvas.addEventListener('mousedown', e => {
       if (!importImage) return;
-      importCropping = true;
       const rect = importOrigCanvas.getBoundingClientRect();
       const scaleX = importOrigCanvas.width / rect.width;
       const scaleY = importOrigCanvas.height / rect.height;
       const canvasX = (e.clientX - rect.left) * scaleX;
       const canvasY = (e.clientY - rect.top) * scaleY;
-      importCropStart = {
-        x: canvasX / importScale,
-        y: canvasY / importScale
-      };
+
+      // Check if clicking on a resize edge/corner
+      const edge = getResizeEdge(canvasX, canvasY);
+      if (edge && importCrop) {
+        importResizeEdge = edge;
+        importCropping = true;
+        importCropStart = { ...importCrop }; // Store original crop for reference
+      } else {
+        // Start new crop
+        importResizeEdge = null;
+        importCropping = true;
+        importCropStart = {
+          x: canvasX / importScale,
+          y: canvasY / importScale
+        };
+      }
     });
 
     importOrigCanvas.addEventListener('mousemove', e => {
-      if (!importCropping || !importImage) return;
       const rect = importOrigCanvas.getBoundingClientRect();
       const scaleX = importOrigCanvas.width / rect.width;
       const scaleY = importOrigCanvas.height / rect.height;
@@ -1079,25 +1273,64 @@
       const imgX = canvasX / importScale;
       const imgY = canvasY / importScale;
 
-      const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
-      const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
-      const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
-      const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+      // Update cursor based on position
+      if (!importCropping && importImage) {
+        const edge = getResizeEdge(canvasX, canvasY);
+        importOrigCanvas.style.cursor = getResizeCursor(edge);
+      }
 
-      if (x2 - x1 > 2 && y2 - y1 > 2) {
-        importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+      if (!importCropping || !importImage) return;
+
+      if (importResizeEdge) {
+        // Resize existing crop
+        const crop = { ...importCropStart };
+        const minSize = 4;
+
+        if (importResizeEdge.includes('n')) {
+          const newY = Math.max(0, Math.min(imgY, crop.y + crop.h - minSize));
+          crop.h = crop.y + crop.h - newY;
+          crop.y = newY;
+        }
+        if (importResizeEdge.includes('s')) {
+          crop.h = Math.max(minSize, Math.min(importImage.height - crop.y, imgY - crop.y));
+        }
+        if (importResizeEdge.includes('w')) {
+          const newX = Math.max(0, Math.min(imgX, crop.x + crop.w - minSize));
+          crop.w = crop.x + crop.w - newX;
+          crop.x = newX;
+        }
+        if (importResizeEdge.includes('e')) {
+          crop.w = Math.max(minSize, Math.min(importImage.width - crop.x, imgX - crop.x));
+        }
+
+        importCrop = crop;
         drawImportOriginal();
         updateImportHeightFromAspect();
         scheduleImportPreview();
+      } else {
+        // Create new crop
+        const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
+        const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
+        const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
+        const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+
+        if (x2 - x1 > 2 && y2 - y1 > 2) {
+          importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+          drawImportOriginal();
+          updateImportHeightFromAspect();
+          scheduleImportPreview();
+        }
       }
     });
 
     importOrigCanvas.addEventListener('mouseup', () => {
       importCropping = false;
+      importResizeEdge = null;
     });
 
     importOrigCanvas.addEventListener('mouseleave', () => {
       importCropping = false;
+      importResizeEdge = null;
     });
 
     // Touch support for crop
@@ -1110,11 +1343,21 @@
       const scaleY = importOrigCanvas.height / rect.height;
       const canvasX = (touch.clientX - rect.left) * scaleX;
       const canvasY = (touch.clientY - rect.top) * scaleY;
-      importCropping = true;
-      importCropStart = {
-        x: canvasX / importScale,
-        y: canvasY / importScale
-      };
+
+      // Check if touching a resize edge/corner
+      const edge = getResizeEdge(canvasX, canvasY);
+      if (edge && importCrop) {
+        importResizeEdge = edge;
+        importCropping = true;
+        importCropStart = { ...importCrop };
+      } else {
+        importResizeEdge = null;
+        importCropping = true;
+        importCropStart = {
+          x: canvasX / importScale,
+          y: canvasY / importScale
+        };
+      }
     }, { passive: false });
 
     importOrigCanvas.addEventListener('touchmove', e => {
@@ -1129,21 +1372,51 @@
       const imgX = canvasX / importScale;
       const imgY = canvasY / importScale;
 
-      const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
-      const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
-      const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
-      const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+      if (importResizeEdge) {
+        // Resize existing crop
+        const crop = { ...importCropStart };
+        const minSize = 4;
 
-      if (x2 - x1 > 2 && y2 - y1 > 2) {
-        importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+        if (importResizeEdge.includes('n')) {
+          const newY = Math.max(0, Math.min(imgY, crop.y + crop.h - minSize));
+          crop.h = crop.y + crop.h - newY;
+          crop.y = newY;
+        }
+        if (importResizeEdge.includes('s')) {
+          crop.h = Math.max(minSize, Math.min(importImage.height - crop.y, imgY - crop.y));
+        }
+        if (importResizeEdge.includes('w')) {
+          const newX = Math.max(0, Math.min(imgX, crop.x + crop.w - minSize));
+          crop.w = crop.x + crop.w - newX;
+          crop.x = newX;
+        }
+        if (importResizeEdge.includes('e')) {
+          crop.w = Math.max(minSize, Math.min(importImage.width - crop.x, imgX - crop.x));
+        }
+
+        importCrop = crop;
         drawImportOriginal();
         updateImportHeightFromAspect();
         scheduleImportPreview();
+      } else {
+        // Create new crop
+        const x1 = Math.max(0, Math.min(importCropStart.x, imgX));
+        const y1 = Math.max(0, Math.min(importCropStart.y, imgY));
+        const x2 = Math.min(importImage.width, Math.max(importCropStart.x, imgX));
+        const y2 = Math.min(importImage.height, Math.max(importCropStart.y, imgY));
+
+        if (x2 - x1 > 2 && y2 - y1 > 2) {
+          importCrop = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+          drawImportOriginal();
+          updateImportHeightFromAspect();
+          scheduleImportPreview();
+        }
       }
     }, { passive: false });
 
     importOrigCanvas.addEventListener('touchend', () => {
       importCropping = false;
+      importResizeEdge = null;
     });
 
     // Import controls
@@ -1170,6 +1443,24 @@
       importImage = null;
       importResult = null;
       importCrop = null;
+      resetPdfState();
+    });
+
+    // PDF page navigation
+    document.getElementById('btn-page-prev').addEventListener('click', async () => {
+      if (importPdfCurrentPage > 1) {
+        importPdfCurrentPage--;
+        await renderPdfPage(importPdfCurrentPage);
+        updatePageIndicator();
+      }
+    });
+
+    document.getElementById('btn-page-next').addEventListener('click', async () => {
+      if (importPdfCurrentPage < importPdfPageCount) {
+        importPdfCurrentPage++;
+        await renderPdfPage(importPdfCurrentPage);
+        updatePageIndicator();
+      }
     });
 
     // Mobile navigation buttons
@@ -1234,6 +1525,7 @@
           importImage = null;
           importResult = null;
           importCrop = null;
+          resetPdfState();
         }
         return;
       }

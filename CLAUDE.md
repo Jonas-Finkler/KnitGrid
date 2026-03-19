@@ -7,7 +7,7 @@ A browser-based knitting pattern viewer and editor. Display patterns row by row 
 ## Technology Stack
 
 - **Vanilla HTML/CSS/JavaScript** - no frameworks or build step
-- **No dependencies** - works offline, just open in browser
+- **PDF.js** - Mozilla's PDF rendering library (bundled locally for offline use)
 - **HTML Canvas** for grid rendering
 - **Nix Flake** for reproducible dev environment (`nix run` / `nix develop`)
 
@@ -31,6 +31,7 @@ The JavaScript is organized into clearly labeled sections:
 - **PAINTING** - Cell painting logic
 - **FILE I/O** - PNG save/load
 - **IMAGE IMPORT** - Photo-to-grid conversion with crop and color quantization
+- **PDF IMPORT** - PDF loading and page rendering via PDF.js
 - **PARTS MANAGEMENT** - Multi-panel pattern handling
 - **EVENT HANDLERS** - All input event setup
 - **INITIALIZATION** - Startup code
@@ -62,14 +63,22 @@ Three zoom modes:
 - `fit`: Stretches pattern to full container width (respects max cell size)
 
 ### Image Import (Photo to Grid)
-The Import button lets users upload any image (JPEG, PNG, etc.) and convert it to a knitting grid:
-- **Crop**: User can click-drag on the original image to select a region
+The Import button lets users upload any image (JPEG, PNG, etc.) or PDF and convert it to a knitting grid:
+- **PDF support**: Uses PDF.js to render PDF pages; page navigation for multi-page PDFs
+- **Crop**: User can click-drag on the original image to select a region, or drag edges/corners to resize selection
 - **Resize**: User chooses target width in stitches (4–1000), height auto-calculated or manually set
 - **Color quantization**: Median cut algorithm reduces colors to 2–20 (user-selectable)
 - **Preview**: Side-by-side view of original (with crop overlay) and quantized result
 - **Lock aspect ratio**: Checkbox to keep width/height proportional to crop selection
 - Pipeline: `drawImage` handles crop+downscale in one step, then median cut quantizes, then pixels mapped to nearest palette color
 - Result replaces current grid/colors, clears parts and history
+
+### PDF Import
+- PDF.js library bundled locally (`pdf.min.mjs` + `pdf.worker.min.mjs`) for offline use
+- PDFs are rendered at 2x scale for quality before entering the crop/quantize pipeline
+- Multi-page PDFs show page navigation controls (Prev/Next buttons)
+- Each page is rendered to a canvas, converted to an Image, then processed like any other image import
+- State variables: `importPdf`, `importPdfPageCount`, `importPdfCurrentPage`
 
 ### Reading Direction
 - Default is bottom-to-top (how real knitters read patterns)
@@ -157,15 +166,17 @@ When navigating rows in display mode, the view automatically scrolls to keep the
 
 ```
 knitgrid/
-├── index.html      # HTML structure and markup
-├── styles.css      # CSS styling and theming
-├── app.js          # JavaScript application logic
-├── flake.nix       # Nix flake for packaging and dev
-├── flake.lock      # Auto-generated lockfile
-├── README.md       # User documentation
-├── CLAUDE.md       # This file - dev notes
-├── LICENSE         # GPL-3.0
-└── .gitignore      # Ignores: result, .direnv
+├── index.html        # HTML structure and markup
+├── styles.css        # CSS styling and theming
+├── app.js            # JavaScript application logic (ES module)
+├── pdf.min.mjs       # PDF.js library (Mozilla, bundled)
+├── pdf.worker.min.mjs # PDF.js web worker
+├── flake.nix         # Nix flake for packaging and dev
+├── flake.lock        # Auto-generated lockfile
+├── README.md         # User documentation
+├── CLAUDE.md         # This file - dev notes
+├── LICENSE           # GPL-3.0
+└── .gitignore        # Ignores: result, .direnv
 ```
 
 ## Potential Future Enhancements

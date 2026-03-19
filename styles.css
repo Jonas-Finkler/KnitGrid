@@ -590,9 +590,9 @@ body {
 
 /* Import photo modal */
 .import-modal {
-  width: 90vw;
-  max-width: 1000px;
-  max-height: 90vh;
+  width: 92vw;
+  max-width: 1100px;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
 }
@@ -628,8 +628,8 @@ body {
 .import-preview-panel canvas {
   width: 100%;
   flex: 1;
-  min-height: 200px;
-  max-height: 50vh;
+  min-height: 250px;
+  max-height: 60vh;
   border: 1px solid var(--border-color);
   border-radius: 4px;
   background: var(--bg-primary);
@@ -677,6 +677,42 @@ body {
 
 #import-file-input {
   display: none;
+}
+
+/* PDF page navigation */
+.import-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.import-page-nav button {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color-dark);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  min-height: 44px;
+}
+
+.import-page-nav button:hover {
+  background: var(--bg-tertiary);
+}
+
+.import-page-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#page-indicator {
+  font-size: 14px;
+  color: var(--text-secondary);
+  min-width: 100px;
+  text-align: center;
 }
 
 /* Touch-friendly canvas */

@@ -9,6 +9,7 @@ Browser-based knitting pattern viewer and editor. Display patterns row by row wh
 - **Row-by-row display mode** - highlights current row, greys out the rest
 - **Multi-part patterns** - work on front/back panels with independent row tracking
 - **Simple editing** - click and drag to paint cells
+- **Import from images or PDFs** - convert photos or PDF patterns to grids with color quantization
 - **Standard PNG format** - patterns are images, edit them anywhere
 - **Undo/redo** - full history support
 - **Dark mode** - easy on the eyes
@@ -18,7 +19,7 @@ Browser-based knitting pattern viewer and editor. Display patterns row by row wh
 
 ### Option 1: Just open it
 
-Download `index.html`, `styles.css`, and `app.js`. Open `index.html` in your browser.
+Download `index.html`, `styles.css`, `app.js`, `pdf.min.mjs`, and `pdf.worker.min.mjs`. Open `index.html` in your browser (requires a local server for PDF import due to ES modules).
 
 ### Option 2: Nix
 

@@ -102,6 +102,11 @@
   <div class="modal-overlay" id="modal-import">
     <div class="modal import-modal">
       <h2>Import Photo</h2>
+      <div class="import-page-nav" id="import-page-nav" style="display: none;">
+        <button id="btn-page-prev">&lt; Prev</button>
+        <span id="page-indicator">Page 1 of 1</span>
+        <button id="btn-page-next">Next &gt;</button>
+      </div>
       <div class="import-previews">
         <div class="import-preview-panel">
           <label>Original (drag to crop)</label>
@@ -139,9 +144,9 @@
   <!-- Hidden inputs -->
   <input type="file" id="file-input" accept="image/png,image/*">
   <input type="file" id="part-file-input" accept="image/png,image/*">
-  <input type="file" id="import-file-input" accept="image/*">
+  <input type="file" id="import-file-input" accept="image/*,.pdf,application/pdf">
   <input type="color" id="color-picker">
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
