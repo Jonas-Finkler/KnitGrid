@@ -565,9 +565,7 @@
 
     const targetW = Math.max(4, Math.min(1000, parseInt(document.getElementById('import-width').value) || 40));
     const targetH = Math.max(4, Math.min(1000, parseInt(document.getElementById('import-height').value) || 40));
-    const numColors = parseInt(document.getElementById('import-colors').value) || 8;
-
-    document.getElementById('import-colors-display').textContent = numColors;
+    const numColors = Math.max(2, Math.min(20, parseInt(document.getElementById('import-colors').value) || 8));
 
     const crop = importCrop || { x: 0, y: 0, w: img.width, h: img.height };
 
@@ -1039,7 +1037,6 @@
           document.getElementById('import-height').value = Math.max(4, Math.round(initWidth / aspect));
           document.getElementById('import-lock-aspect').checked = true;
           document.getElementById('import-colors').value = 8;
-          document.getElementById('import-colors-display').textContent = '8';
 
           document.getElementById('modal-import').classList.add('active');
 
@@ -1164,11 +1161,7 @@
       scheduleImportPreview();
     });
 
-    document.getElementById('import-colors').addEventListener('input', () => {
-      document.getElementById('import-colors-display').textContent =
-        document.getElementById('import-colors').value;
-      scheduleImportPreview();
-    });
+    document.getElementById('import-colors').addEventListener('input', scheduleImportPreview);
 
     document.getElementById('btn-import-apply').addEventListener('click', applyImport);
 
