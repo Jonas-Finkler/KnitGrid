@@ -1328,6 +1328,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
     importOrigCanvas.addEventListener('mouseup', () => {
       importCropping = false;
       importResizeEdge = null;
+      // Immediate update when mouse released
+      updateImportPreview();
     });
 
     importOrigCanvas.addEventListener('mouseleave', () => {
@@ -1419,6 +1421,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.mjs';
     importOrigCanvas.addEventListener('touchend', () => {
       importCropping = false;
       importResizeEdge = null;
+      // Immediate update when touch ends
+      updateImportPreview();
     });
 
     // Import controls
